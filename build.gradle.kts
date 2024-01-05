@@ -9,8 +9,10 @@ repositories {
 }
 
 dependencies {
+    val typesafeConfigVersion = properties["typesafe-config.version"] as String
     val kotlinTelegramBotVersion = properties["kotlin-telegram-bot.version"] as String
 
+    implementation("com.typesafe:config:$typesafeConfigVersion")
     implementation("io.github.kotlin-telegram-bot.kotlin-telegram-bot:telegram:$kotlinTelegramBotVersion")
 
     testImplementation(kotlin("test"))

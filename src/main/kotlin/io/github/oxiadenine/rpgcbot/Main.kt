@@ -11,7 +11,14 @@ fun main() {
 
         dispatch {
             command("start") {
-                bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = "RPGc Bot")
+                val userId = message.chat.id
+
+                val intl = Intl(message.from?.languageCode ?: Intl.DEFAULT_LOCALE)
+
+                bot.sendMessage(
+                    chatId = ChatId.fromId(userId),
+                    text = intl.translate(id = "command.start.message")
+                )
             }
         }
     }

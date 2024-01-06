@@ -7,6 +7,7 @@ pluginManagement {
         val kotlinVersion = extra["kotlin.version"] as String
 
         kotlin("jvm").version(kotlinVersion)
+        kotlin("plugin.serialization").version(kotlinVersion)
     }
 }
 

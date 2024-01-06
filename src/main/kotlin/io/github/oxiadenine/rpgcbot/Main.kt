@@ -5,6 +5,8 @@ import com.github.kotlintelegrambot.dispatch
 import com.github.kotlintelegrambot.dispatcher.*
 import com.github.kotlintelegrambot.entities.ChatId
 import com.github.kotlintelegrambot.entities.ReplyKeyboardRemove
+import com.github.kotlintelegrambot.entities.inlinequeryresults.InlineQueryResult
+import com.github.kotlintelegrambot.entities.inlinequeryresults.InputMessageContent
 import com.github.kotlintelegrambot.extensions.filters.Filter
 import io.github.oxiadenine.rpgcbot.network.TelegraphApi
 import io.github.oxiadenine.rpgcbot.view.CharacterKeyboardReplyMarkup
@@ -344,6 +346,40 @@ fun main() {
                     text = intl.translate(id = "command.cancel.message", value = "command" to command.toString()),
                     replyMarkup = ReplyKeyboardRemove()
                 )
+            }
+
+            inlineQuery {
+                val userId = inlineQuery.from.id
+
+                val intl = Intl(inlineQuery.from.languageCode ?: Intl.DEFAULT_LOCALE)
+
+                val pageTitleQuery = inlineQuery.query
+
+                if (pageTitleQuery.isBlank() or pageTitleQuery.isEmpty()) return@inlineQuery
+
+                telegraphApi.getPageList(TelegraphApi.GetPageList(accessToken = telegraphAccessToken))
+                    .onSuccess { pageList ->
+                        val pageInlineQueryResults = pageList.pages
+                            .filter { page -> page.title.lowercase().contains(pageTitleQuery.lowercase()) }
+                            .map { page -> telegraphApi.getPage(TelegraphApi.GetPage(path = page.path)).getOrThrow() }
+                            .map { page ->
+                                InlineQueryResult.Article(
+                                    id = page.path,
+                                    title = page.title,
+                                    inputMessageContent = InputMessageContent.Text(page.url),
+                                    description = games.first { game ->
+                                        game.code == page.path.substringBefore("-")
+                                    }.name
+                                )
+                            }
+
+                        bot.answerInlineQuery(inlineQuery.id, pageInlineQueryResults)
+                    }.onFailure {
+                        bot.sendMessage(
+                            chatId = ChatId.fromId(userId),
+                            text = intl.translate(id = "command.error.message")
+                        )
+                    }
             }
         }
     }

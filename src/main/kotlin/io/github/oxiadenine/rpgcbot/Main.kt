@@ -268,6 +268,10 @@ fun main() {
                                     accessToken = telegraphAccessToken
                                 )).getOrThrow()
 
+                                pageList.pages.firstOrNull { page ->
+                                        page.path.contains("${game.code}-${characterName}")
+                                } ?: return@message
+
                                 val page = telegraphApi.getPage(TelegraphApi.GetPage(
                                     path = pageList.pages.first { page ->
                                         page.path.contains("${game.code}-${characterName}")

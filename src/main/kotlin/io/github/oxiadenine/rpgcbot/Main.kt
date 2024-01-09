@@ -67,18 +67,18 @@ fun main() {
 
         dispatch {
             command(Command.START.toString()) {
-                val userId = message.chat.id
-
                 val intl = Intl(message.from?.languageCode ?: Intl.DEFAULT_LOCALE)
+
+                val userId = message.chat.id
 
                 bot.sendMessage(chatId = ChatId.fromId(userId), text = intl.translate(id = "command.start.message"))
             }
 
             Command.entries.drop(1).dropLast(1).map { command ->
                 command(command.toString()) {
-                    val userId = message.chat.id
-
                     val intl = Intl(message.from?.languageCode ?: Intl.DEFAULT_LOCALE)
+
+                    val userId = message.chat.id
 
                     bot.sendMessage(
                         chatId = ChatId.fromId(userId),
@@ -111,9 +111,9 @@ fun main() {
 
             games.map { game ->
                 callbackQuery(game.code) {
-                    val userId = callbackQuery.message?.chat?.id ?: return@callbackQuery
-
                     val intl = Intl(callbackQuery.from.languageCode ?: Intl.DEFAULT_LOCALE)
+
+                    val userId = callbackQuery.message?.chat?.id ?: return@callbackQuery
 
                     val command = currentCommandMap[userId] ?: return@callbackQuery
 
@@ -169,9 +169,9 @@ fun main() {
             }
 
             message(Filter.Text) {
-                val userId = message.chat.id
-
                 val intl = Intl(message.from?.languageCode ?: Intl.DEFAULT_LOCALE)
+
+                val userId = message.chat.id
 
                 val command = currentCommandMap[userId] ?: return@message
                 val game = currentGameMap[userId] ?: return@message
@@ -347,9 +347,9 @@ fun main() {
             }
 
             command(Command.CANCEL.toString()) {
-                val userId = message.chat.id
-
                 val intl = Intl(message.from?.languageCode ?: Intl.DEFAULT_LOCALE)
+
+                val userId = message.chat.id
 
                 val command = currentCommandMap[userId] ?: return@command
 
@@ -365,9 +365,9 @@ fun main() {
             }
 
             inlineQuery {
-                val userId = inlineQuery.from.id
-
                 val intl = Intl(inlineQuery.from.languageCode ?: Intl.DEFAULT_LOCALE)
+
+                val userId = inlineQuery.from.id
 
                 val pageTitleQuery = inlineQuery.query
 

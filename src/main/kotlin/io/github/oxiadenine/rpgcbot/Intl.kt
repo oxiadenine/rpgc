@@ -2,9 +2,9 @@ package io.github.oxiadenine.rpgcbot
 
 import com.typesafe.config.ConfigFactory
 
-class Intl(locale: String = DEFAULT_LOCALE) {
+class Intl(locale: String) {
     companion object {
-        val DEFAULT_LOCALE = Language.ENGLISH.locale
+        val DEFAULT_LOCALE = Language.SPANISH.locale
     }
 
     enum class Language(val locale: String) {

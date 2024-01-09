@@ -2,9 +2,8 @@ package io.github.oxiadenine.rpgcbot.network
 
 import io.ktor.client.*
 import io.ktor.client.call.*
-import io.ktor.client.plugins.resources.*
+import io.ktor.client.request.*
 import io.ktor.client.statement.*
-import io.ktor.resources.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -26,8 +25,8 @@ class TelegraphApi(private val httpClient: HttpClient) {
     @Serializable
     data class PageList(@SerialName("total_count") val totalCount: Int, val pages: Array<Page>)
 
-    @Resource("/createPage")
-    class CreatePage(
+    @Serializable
+    data class CreatePage(
         @SerialName("access_token") val accessToken: String,
         val title: String,
         @SerialName("author_name") val authorName: String? = null,
@@ -36,9 +35,8 @@ class TelegraphApi(private val httpClient: HttpClient) {
         @SerialName("return_content") val returnContent: Boolean = false
     )
 
-    @Resource("/editPage/{path}")
-    class EditPage(
-        val path: String,
+    @Serializable
+    data class EditPage(
         @SerialName("access_token") val accessToken: String,
         val title: String,
         val content: String,
@@ -47,11 +45,15 @@ class TelegraphApi(private val httpClient: HttpClient) {
         @SerialName("return_content") val returnContent: Boolean = false
     )
 
-    @Resource("/getPage/{path}")
-    class GetPage(val path: String, @SerialName("return_content") val returnContent: Boolean = true)
+    @Serializable
+    data class GetPage(@SerialName("return_content") val returnContent: Boolean = true)
 
-    @Resource("/getPageList")
-    class GetPageList(@SerialName("access_token") val accessToken: String, val offset: Int = 0, val limit: Int = 50)
+    @Serializable
+    data class GetPageList(
+        @SerialName("access_token") val accessToken: String,
+        val offset: Int = 0,
+        val limit: Int = 50
+    )
 
     @Serializable
     data class PageResponse(val ok: Boolean, val result: Page?, val error: String?)
@@ -60,19 +62,19 @@ class TelegraphApi(private val httpClient: HttpClient) {
     data class PageListResponse(val ok: Boolean, val result: PageList?, val error: String?)
 
     suspend fun createPage(createPage: CreatePage) = runCatching {
-        handlePageResponse(httpClient.get(createPage))
+        handlePageResponse(httpClient.post("/createPage") { setBody(createPage) })
     }
 
-    suspend fun editPage(editPage: EditPage) = runCatching {
-        handlePageResponse(httpClient.get(editPage))
+    suspend fun editPage(path: String, editPage: EditPage) = runCatching {
+        handlePageResponse(httpClient.post("/editPage/$path") { setBody(editPage) })
     }
 
-    suspend fun getPage(getPage: GetPage) = runCatching {
-        handlePageResponse(httpClient.get(getPage))
+    suspend fun getPage(path:String, getPage: GetPage) = runCatching {
+        handlePageResponse(httpClient.post("/getPage/$path") { setBody(getPage) })
     }
 
     suspend fun getPageList(getPageList: GetPageList) = runCatching {
-        handlePageListResponse(httpClient.get(getPageList))
+        handlePageListResponse(httpClient.post("/getPageList") { setBody(getPageList) })
     }
 
     private suspend fun handlePageResponse(httpResponse: HttpResponse): Page {

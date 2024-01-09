@@ -15,7 +15,7 @@ import io.ktor.client.*
 import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.client.plugins.resources.*
+import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
@@ -51,11 +51,15 @@ fun main() {
 
         val telegraphApi = TelegraphApi(HttpClient(CIO) {
             install(ContentNegotiation) {
-                json(Json { explicitNulls = false })
+                json(Json {
+                    explicitNulls = false
+                    encodeDefaults = true
+                })
             }
-            install(Resources)
             install(DefaultRequest) {
                 url("https://api.telegra.ph/")
+
+                contentType(ContentType.Application.Json)
             }
 
             expectSuccess = true
@@ -192,8 +196,7 @@ fun main() {
                                 )).onSuccess { page ->
                                     character!!.id = page.path
 
-                                    telegraphApi.editPage(TelegraphApi.EditPage(
-                                        path = character!!.id,
+                                    telegraphApi.editPage(character!!.id, TelegraphApi.EditPage(
                                         accessToken = telegraphAccessToken,
                                         title = character!!.name,
                                         content = "[\"${character!!.description}\"]",
@@ -210,8 +213,7 @@ fun main() {
                                 }
                             }
                             Command.EDIT_CHAR_PAGE -> {
-                                telegraphApi.editPage(TelegraphApi.EditPage(
-                                    path = character!!.id,
+                                telegraphApi.editPage(character!!.id, TelegraphApi.EditPage(
                                     accessToken = telegraphAccessToken,
                                     title = character!!.name,
                                     content = "[\"${character!!.description}\"]",
@@ -272,11 +274,9 @@ fun main() {
                                         page.path.contains("${game.code}-${characterName}")
                                 } ?: return@message
 
-                                val page = telegraphApi.getPage(TelegraphApi.GetPage(
-                                    path = pageList.pages.first { page ->
-                                        page.path.contains("${game.code}-${characterName}")
-                                    }.path
-                                )).getOrThrow()
+                                val page = telegraphApi.getPage(pageList.pages.first { page ->
+                                    page.path.contains("${game.code}-${characterName}")
+                                }.path, TelegraphApi.GetPage()).getOrThrow()
 
                                 character = Character().apply {
                                     id = page.path
@@ -377,7 +377,7 @@ fun main() {
                     .onSuccess { pageList ->
                         val pageInlineQueryResults = pageList.pages
                             .filter { page -> page.title.lowercase().contains(pageTitleQuery.lowercase()) }
-                            .map { page -> telegraphApi.getPage(TelegraphApi.GetPage(path = page.path)).getOrThrow() }
+                            .map { page -> telegraphApi.getPage(page.path, TelegraphApi.GetPage()).getOrThrow() }
                             .map { page ->
                                 InlineQueryResult.Article(
                                     id = page.path,

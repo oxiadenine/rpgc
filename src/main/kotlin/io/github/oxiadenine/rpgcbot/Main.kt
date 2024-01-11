@@ -18,7 +18,9 @@ import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.json.Json
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.*
+import org.jsoup.Jsoup
 import java.util.concurrent.ConcurrentHashMap
 
 enum class Command {
@@ -184,7 +186,29 @@ fun main() {
 
                 runCatching {
                     if (character != null) {
-                        character!!.description = Character.Description(message.text!!).value
+                        character!!.description = Character.Description(
+                            Jsoup.parse(message.text!!).body().select(">*")
+                                .joinToString(",") { element ->
+                                    if (element.tagName() == "ol" || element.tagName() == "ul") {
+                                        Json.encodeToString(TelegraphApi.Node(
+                                            tag = element.tagName(),
+                                            children = element.select(">*").map { childElement ->
+                                                TelegraphApi.NodeElement(
+                                                    tag = childElement.tagName(),
+                                                    children = listOf(childElement.text())
+                                                )
+                                            }
+                                        ))
+                                    } else {
+                                        Json.encodeToString(
+                                            TelegraphApi.NodeElement(
+                                                tag = element.tagName(),
+                                                children = listOf(element.text())
+                                            )
+                                        )
+                                    }
+                                }
+                        ).value
 
                         when (command) {
                             Command.NEW_CHAR_PAGE -> {
@@ -192,14 +216,14 @@ fun main() {
                                     accessToken = telegraphAccessToken,
                                     title = "${game.code}-${character!!.name.lowercase()}",
                                     authorName = telegraphUsername,
-                                    content = "[\"${character!!.description}\"]"
+                                    content = "[${character!!.description}]"
                                 )).onSuccess { page ->
                                     character!!.id = page.path
 
                                     telegraphApi.editPage(character!!.id, TelegraphApi.EditPage(
                                         accessToken = telegraphAccessToken,
                                         title = character!!.name,
-                                        content = "[\"${character!!.description}\"]",
+                                        content = "[${character!!.description}]",
                                         authorName = telegraphUsername
                                     )).getOrThrow()
                                 }.onSuccess {
@@ -216,7 +240,7 @@ fun main() {
                                 telegraphApi.editPage(character!!.id, TelegraphApi.EditPage(
                                     accessToken = telegraphAccessToken,
                                     title = character!!.name,
-                                    content = "[\"${character!!.description}\"]",
+                                    content = "[${character!!.description}]",
                                     authorName = telegraphUsername
                                 )).getOrThrow()
 
@@ -271,17 +295,43 @@ fun main() {
                                 )).getOrThrow()
 
                                 pageList.pages.firstOrNull { page ->
-                                        page.path.contains("${game.code}-${characterName}")
+                                    page.path.contains("${game.code}-${characterName}")
                                 } ?: return@message
 
                                 val page = telegraphApi.getPage(pageList.pages.first { page ->
                                     page.path.contains("${game.code}-${characterName}")
                                 }.path, TelegraphApi.GetPage()).getOrThrow()
 
+                                val characterDescription = buildString {
+                                    page.content!!.map { node ->
+                                        append("<${node.jsonObject["tag"]!!.jsonPrimitive.content}>")
+                                        node.jsonObject["children"]?.jsonArray?.let { children ->
+                                            if (children.first() is JsonObject) appendLine()
+                                            children.map { node ->
+                                                when (node) {
+                                                    is JsonObject -> {
+                                                        append("<${node.jsonObject["tag"]!!.jsonPrimitive.content}>")
+                                                        node.jsonObject["children"]?.jsonArray?.let { children ->
+                                                            children.map { element ->
+                                                                append(element.jsonPrimitive.content)
+                                                            }
+                                                        }
+                                                        append("</${node.jsonObject["tag"]!!.jsonPrimitive.content}>")
+                                                        appendLine()
+                                                    }
+                                                    else -> append(node.jsonPrimitive.content)
+                                                }
+                                            }
+                                            append("</${node.jsonObject["tag"]!!.jsonPrimitive.content}>")
+                                            appendLine()
+                                        } ?: appendLine()
+                                    }
+                                }
+
                                 character = Character().apply {
                                     id = page.path
                                     name = page.title
-                                    description = page.content!![0]
+                                    description = characterDescription
                                 }
 
                                 currentCharacterMap[userId] = character!!

@@ -6,6 +6,7 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonArray
 
 class TelegraphApi(private val httpClient: HttpClient) {
     @Serializable
@@ -17,13 +18,19 @@ class TelegraphApi(private val httpClient: HttpClient) {
         @SerialName("author_name") val authorName: String? = null,
         @SerialName("author_url") val authorUrl: String? = null,
         @SerialName("image_url") val imageUrl: String? = null,
-        val content: List<String>? = null,
+        val content: JsonArray? = null,
         val views: Int,
         @SerialName("can_edit") val canEdit: Boolean? = null
     )
 
     @Serializable
     data class PageList(@SerialName("total_count") val totalCount: Int, val pages: Array<Page>)
+
+    @Serializable
+    data class Node(val tag: String, val children: List<NodeElement>? = null)
+
+    @Serializable
+    data class NodeElement(val tag: String, val children: List<String>? = null)
 
     @Serializable
     data class CreatePage(

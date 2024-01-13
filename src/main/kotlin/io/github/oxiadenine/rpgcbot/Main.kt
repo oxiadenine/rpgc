@@ -212,9 +212,11 @@ fun main() {
 
                         when (command) {
                             Command.NEW_CHAR_PAGE -> {
+                                val characterName = character!!.name.lowercase().replace(" ", "-")
+
                                 telegraphApi.createPage(TelegraphApi.CreatePage(
                                     accessToken = telegraphAccessToken,
-                                    title = "${game.code}-${character!!.name.lowercase()}",
+                                    title = "${game.code}-${characterName}",
                                     authorName = telegraphUsername,
                                     content = "[${character!!.description}]"
                                 )).onSuccess { page ->
@@ -261,46 +263,50 @@ fun main() {
                     } else {
                         when (command) {
                             Command.NEW_CHAR_PAGE -> {
-                                val characterName = Character.Name(message.text!!).value.lowercase()
+                                val characterName = Character.Name(message.text!!).value
 
                                 val pageList = telegraphApi.getPageList(TelegraphApi.GetPageList(
                                     accessToken = telegraphAccessToken
                                 )).getOrThrow()
 
-                                if (pageList.pages.none { page ->
-                                    page.path.contains("${game.code}-${characterName}")
-                                }) {
-                                    character = Character().apply {
-                                        name = characterName.split(" ").joinToString(" ") { part ->
-                                            part.replaceFirstChar { it.uppercase() }
-                                        }
+                                val pageExists = pageList.pages
+                                    .filter { page -> page.path.contains(game.code) }
+                                    .any { page -> page.title.equals(characterName, ignoreCase = true) }
+
+                                if (pageExists) {
+                                    throw Character.Name.ExistsException()
+                                }
+
+                                character = Character().apply {
+                                    name = characterName.lowercase().trim().split(" ").joinToString(" ") { part ->
+                                        part.replaceFirstChar { it.uppercase() }
                                     }
+                                }
 
-                                    currentCharacterMap[userId] = character!!
+                                currentCharacterMap[userId] = character!!
 
-                                    bot.sendMessage(
-                                        chatId = ChatId.fromId(userId),
-                                        text = intl.translate(
-                                            id = "command.new.character.input.content.message",
-                                            value = "title" to character!!.name
-                                        )
+                                bot.sendMessage(
+                                    chatId = ChatId.fromId(userId),
+                                    text = intl.translate(
+                                        id = "command.new.character.input.content.message",
+                                        value = "title" to character!!.name
                                     )
-                                } else throw Character.Name.ExistsException()
+                                )
                             }
                             Command.EDIT_CHAR_PAGE -> {
-                                val characterName = message.text!!.lowercase()
+                                val characterName = message.text!!
 
                                 val pageList = telegraphApi.getPageList(TelegraphApi.GetPageList(
                                     accessToken = telegraphAccessToken
                                 )).getOrThrow()
 
-                                pageList.pages.firstOrNull { page ->
-                                    page.path.contains("${game.code}-${characterName}")
-                                } ?: return@message
-
-                                val page = telegraphApi.getPage(pageList.pages.first { page ->
-                                    page.path.contains("${game.code}-${characterName}")
-                                }.path, TelegraphApi.GetPage()).getOrThrow()
+                                val page = pageList.pages
+                                    .filter { page -> page.path.contains(game.code) }
+                                    .firstOrNull { page ->
+                                        page.title.equals(characterName, ignoreCase = true)
+                                    }?.let { page ->
+                                        telegraphApi.getPage(page.path, TelegraphApi.GetPage()).getOrThrow()
+                                    } ?: return@message
 
                                 val characterDescription = buildString {
                                     page.content!!.map { node ->

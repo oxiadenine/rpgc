@@ -20,7 +20,7 @@ class Character {
                 throw LengthException()
             }
 
-            if (!value.matches("^[a-z A-Z]+$".toRegex())) {
+            if (!value.matches("^([a-zA-Z0-9.]+\\s?)+$".toRegex())) {
                 throw InvalidException()
             }
         }

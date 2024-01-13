@@ -1,0 +1,6 @@
+services:
+  rpgc_bot:
+    image: rpgc-bot
+    container_name: rpgc-bot
+    build: ./
+    env_file: .env

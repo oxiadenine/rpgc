@@ -1,0 +1,10 @@
+.idea
+.git*
+.gradle
+build
+.env*
+Dockerfile
+docker-compose.yml
+gradlew*
+LICENSE
+README.md

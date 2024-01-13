@@ -38,6 +38,21 @@ application {
     mainClass.set("${project.group}.rpgcbot.MainKt")
 }
 
-tasks.test {
-    useJUnitPlatform()
+tasks {
+    test {
+        useJUnitPlatform()
+    }
+
+    jar {
+        archiveBaseName.set(project.name)
+        archiveVersion.set("")
+
+        manifest.attributes["Main-Class"] = application.mainClass.get()
+
+        from(configurations.runtimeClasspath.get().map { file: File ->
+            if (file.isDirectory) file else zipTree(file)
+        })
+
+        duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    }
 }

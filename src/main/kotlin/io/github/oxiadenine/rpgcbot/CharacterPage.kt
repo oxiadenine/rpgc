@@ -20,7 +20,7 @@ class CharacterPage {
                 throw LengthException()
             }
 
-            if (!value.matches("^([a-zA-Z0-9.]+\\s?)+$".toRegex())) {
+            if (!value.matches("^([A-Za-zÀ-ÖØ-öø-ÿ0-9.]+\\s?)+$".toRegex())) {
                 throw InvalidException()
             }
         }

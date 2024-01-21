@@ -21,6 +21,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import org.jsoup.Jsoup
+import java.text.Normalizer
 import java.util.concurrent.ConcurrentHashMap
 
 enum class Command {
@@ -212,7 +213,10 @@ fun main() {
 
                         when (command) {
                             Command.NEW_CHAR_PAGE -> {
-                                val characterPageTitle = characterPage!!.title.lowercase().replace(" ", "-")
+                                val characterPageTitle =  Normalizer.normalize(characterPage!!.title, Normalizer.Form.NFKD)
+                                    .replace("\\p{M}".toRegex(), "")
+                                    .lowercase()
+                                    .replace(" ", "-")
 
                                 telegraphApi.createPage(TelegraphApi.CreatePage(
                                     accessToken = telegraphAccessToken,

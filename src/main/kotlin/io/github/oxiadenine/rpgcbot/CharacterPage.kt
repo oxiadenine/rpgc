@@ -3,9 +3,9 @@ package io.github.oxiadenine.rpgcbot
 import java.lang.IllegalArgumentException
 import java.lang.IllegalStateException
 
-class Character {
+class CharacterPage {
     @JvmInline
-    value class Name(val value: String) {
+    value class Title(val value: String) {
         class BlankException : IllegalArgumentException()
         class LengthException : IllegalArgumentException()
         class InvalidException : IllegalArgumentException()
@@ -27,7 +27,7 @@ class Character {
     }
 
     @JvmInline
-    value class Description(val value: String) {
+    value class Content(val value: String) {
         class BlankException : IllegalArgumentException()
         class LengthException : IllegalArgumentException()
 
@@ -42,7 +42,7 @@ class Character {
         }
     }
 
-    var id = ""
-    var name = ""
-    var description = ""
+    var path = ""
+    var title = ""
+    var content = ""
 }

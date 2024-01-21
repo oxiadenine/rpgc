@@ -9,7 +9,7 @@ import com.github.kotlintelegrambot.entities.inlinequeryresults.InlineQueryResul
 import com.github.kotlintelegrambot.entities.inlinequeryresults.InputMessageContent
 import com.github.kotlintelegrambot.extensions.filters.Filter
 import io.github.oxiadenine.rpgcbot.network.TelegraphApi
-import io.github.oxiadenine.rpgcbot.view.CharacterKeyboardReplyMarkup
+import io.github.oxiadenine.rpgcbot.view.CharacterPageKeyboardReplyMarkup
 import io.github.oxiadenine.rpgcbot.view.GameInlineKeyboardMarkup
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
@@ -69,7 +69,7 @@ fun main() {
 
         val currentCommandMap = ConcurrentHashMap<Long, Command>()
         val currentGameMap = ConcurrentHashMap<Long, Game>()
-        val currentCharacterMap = ConcurrentHashMap<Long, Character>()
+        val currentCharacterPageMap = ConcurrentHashMap<Long, CharacterPage>()
 
         dispatch {
             command(Command.START.toString()) {
@@ -94,7 +94,7 @@ fun main() {
                         bot.deleteMessage(chatId = ChatId.fromId(userId), messageId = message.messageId)
                     }
 
-                    currentCharacterMap.remove(userId)
+                    currentCharacterPageMap.remove(userId)
                     currentGameMap.remove(userId)
                     currentCommandMap.remove(userId)
 
@@ -129,22 +129,22 @@ fun main() {
 
                             bot.sendMessage(
                                 chatId = ChatId.fromId(userId),
-                                text = intl.translate(id = "command.new.character.input.title.message")
+                                text = intl.translate(id = "command.new.character.page.title.message")
                             )
                         }
                         Command.EDIT_CHAR_PAGE -> {
                             telegraphApi.getPageList(TelegraphApi.GetPageList(accessToken = telegraphAccessToken))
                                 .onSuccess { pageList ->
-                                    val characters = pageList.pages
+                                    val characterPages = pageList.pages
                                         .filter { page -> page.path.contains(game.code) }
                                         .map { page ->
-                                            Character().apply {
-                                                id = page.path
-                                                name = page.title
+                                            CharacterPage().apply {
+                                                path = page.path
+                                                title = page.title
                                             }
                                         }
 
-                                    if (characters.isEmpty()) {
+                                    if (characterPages.isEmpty()) {
                                         bot.sendMessage(
                                             chatId = ChatId.fromId(userId),
                                             text = intl.translate(id = "command.game.list.empty.message")
@@ -154,8 +154,8 @@ fun main() {
 
                                         bot.sendMessage(
                                             chatId = ChatId.fromId(userId),
-                                            text = intl.translate(id = "command.edit.character.list.message"),
-                                            replyMarkup = CharacterKeyboardReplyMarkup.create(characters)
+                                            text = intl.translate(id = "command.edit.character.page.list.message"),
+                                            replyMarkup = CharacterPageKeyboardReplyMarkup.create(characterPages)
                                         )
                                     }
                                 }.onFailure {
@@ -164,7 +164,7 @@ fun main() {
                                         text = intl.translate(id = "command.error.message")
                                     )
 
-                                    currentCharacterMap.remove(userId)
+                                    currentCharacterPageMap.remove(userId)
                                     currentGameMap.remove(userId)
                                     currentCommandMap.remove(userId)
                                 }
@@ -182,11 +182,11 @@ fun main() {
                 val command = currentCommandMap[userId] ?: return@message
                 val game = currentGameMap[userId] ?: return@message
 
-                var character = currentCharacterMap[userId]
+                var characterPage = currentCharacterPageMap[userId]
 
                 runCatching {
-                    if (character != null) {
-                        character!!.description = Character.Description(
+                    if (characterPage != null) {
+                        characterPage!!.content = CharacterPage.Content(
                             Jsoup.parse(message.text!!).body().select(">*")
                                 .joinToString(",") { element ->
                                     if (element.tagName() == "ol" || element.tagName() == "ul") {
@@ -212,58 +212,58 @@ fun main() {
 
                         when (command) {
                             Command.NEW_CHAR_PAGE -> {
-                                val characterName = character!!.name.lowercase().replace(" ", "-")
+                                val characterPageTitle = characterPage!!.title.lowercase().replace(" ", "-")
 
                                 telegraphApi.createPage(TelegraphApi.CreatePage(
                                     accessToken = telegraphAccessToken,
-                                    title = "${game.code}-${characterName}",
+                                    title = "${game.code}-${characterPageTitle}",
                                     authorName = telegraphUsername,
-                                    content = "[${character!!.description}]"
+                                    content = "[${characterPage!!.content}]"
                                 )).onSuccess { page ->
-                                    character!!.id = page.path
+                                    characterPage!!.path = page.path
 
-                                    telegraphApi.editPage(character!!.id, TelegraphApi.EditPage(
+                                    telegraphApi.editPage(characterPage!!.path, TelegraphApi.EditPage(
                                         accessToken = telegraphAccessToken,
-                                        title = character!!.name,
-                                        content = "[${character!!.description}]",
+                                        title = characterPage!!.title,
+                                        content = "[${characterPage!!.content}]",
                                         authorName = telegraphUsername
                                     )).getOrThrow()
                                 }.onSuccess {
                                     bot.sendMessage(
                                         chatId = ChatId.fromId(userId),
                                         text = intl.translate(
-                                            id = "command.new.character.success.message",
-                                            value = "title" to character!!.name
+                                            id = "command.new.character.page.success.message",
+                                            value = "title" to characterPage!!.title
                                         )
                                     )
                                 }
                             }
                             Command.EDIT_CHAR_PAGE -> {
-                                telegraphApi.editPage(character!!.id, TelegraphApi.EditPage(
+                                telegraphApi.editPage(characterPage!!.path, TelegraphApi.EditPage(
                                     accessToken = telegraphAccessToken,
-                                    title = character!!.name,
-                                    content = "[${character!!.description}]",
+                                    title = characterPage!!.title,
+                                    content = "[${characterPage!!.content}]",
                                     authorName = telegraphUsername
                                 )).getOrThrow()
 
                                 bot.sendMessage(
                                     chatId = ChatId.fromId(userId),
                                     text = intl.translate(
-                                        id = "command.edit.character.success.message",
-                                        value = "title" to character!!.name
+                                        id = "command.edit.character.page.success.message",
+                                        value = "title" to characterPage!!.title
                                     )
                                 )
                             }
                             else -> return@message
                         }
 
-                        currentCharacterMap.remove(userId)
+                        currentCharacterPageMap.remove(userId)
                         currentGameMap.remove(userId)
                         currentCommandMap.remove(userId)
                     } else {
                         when (command) {
                             Command.NEW_CHAR_PAGE -> {
-                                val characterName = Character.Name(message.text!!).value
+                                val characterPageTitle = CharacterPage.Title(message.text!!).value
 
                                 val pageList = telegraphApi.getPageList(TelegraphApi.GetPageList(
                                     accessToken = telegraphAccessToken
@@ -271,30 +271,30 @@ fun main() {
 
                                 val pageExists = pageList.pages
                                     .filter { page -> page.path.contains(game.code) }
-                                    .any { page -> page.title.equals(characterName, ignoreCase = true) }
+                                    .any { page -> page.title.equals(characterPageTitle, ignoreCase = true) }
 
                                 if (pageExists) {
-                                    throw Character.Name.ExistsException()
+                                    throw CharacterPage.Title.ExistsException()
                                 }
 
-                                character = Character().apply {
-                                    name = characterName.lowercase().trim().split(" ").joinToString(" ") { part ->
+                                characterPage = CharacterPage().apply {
+                                    title = characterPageTitle.lowercase().trim().split(" ").joinToString(" ") { part ->
                                         part.replaceFirstChar { it.uppercase() }
                                     }
                                 }
 
-                                currentCharacterMap[userId] = character!!
+                                currentCharacterPageMap[userId] = characterPage!!
 
                                 bot.sendMessage(
                                     chatId = ChatId.fromId(userId),
                                     text = intl.translate(
-                                        id = "command.new.character.input.content.message",
-                                        value = "title" to character!!.name
+                                        id = "command.new.character.page.content.message",
+                                        value = "title" to characterPage!!.title
                                     )
                                 )
                             }
                             Command.EDIT_CHAR_PAGE -> {
-                                val characterName = message.text!!
+                                val characterPageTitle = message.text!!
 
                                 val pageList = telegraphApi.getPageList(TelegraphApi.GetPageList(
                                     accessToken = telegraphAccessToken
@@ -303,12 +303,12 @@ fun main() {
                                 val page = pageList.pages
                                     .filter { page -> page.path.contains(game.code) }
                                     .firstOrNull { page ->
-                                        page.title.equals(characterName, ignoreCase = true)
+                                        page.title.equals(characterPageTitle, ignoreCase = true)
                                     }?.let { page ->
                                         telegraphApi.getPage(page.path, TelegraphApi.GetPage()).getOrThrow()
                                     } ?: return@message
 
-                                val characterDescription = buildString {
+                                val characterPageContent = buildString {
                                     page.content!!.map { node ->
                                         append("<${node.jsonObject["tag"]!!.jsonPrimitive.content}>")
                                         node.jsonObject["children"]?.jsonArray?.let { children ->
@@ -334,28 +334,28 @@ fun main() {
                                     }
                                 }
 
-                                character = Character().apply {
-                                    id = page.path
-                                    name = page.title
-                                    description = characterDescription
+                                characterPage = CharacterPage().apply {
+                                    path = page.path
+                                    title = page.title
+                                    content = characterPageContent
                                 }
 
-                                currentCharacterMap[userId] = character!!
+                                currentCharacterPageMap[userId] = characterPage!!
 
                                 bot.sendMessage(
                                     chatId = ChatId.fromId(userId),
                                     text = intl.translate(
-                                        id = "command.edit.character.input.content.message1",
-                                        value = "title" to character!!.name
+                                        id = "command.edit.character.page.content.message1",
+                                        value = "title" to characterPage!!.title
                                     ),
                                     replyMarkup = ReplyKeyboardRemove()
                                 )
 
-                                bot.sendMessage(chatId = ChatId.fromId(userId), text = character!!.description)
+                                bot.sendMessage(chatId = ChatId.fromId(userId), text = characterPage!!.content)
 
                                 bot.sendMessage(
                                     chatId = ChatId.fromId(userId),
-                                    text = intl.translate(id = "command.edit.character.input.content.message2")
+                                    text = intl.translate(id = "command.edit.character.page.content.message2")
                                 )
                             }
                             else -> return@message
@@ -363,29 +363,29 @@ fun main() {
                     }
                 }.onFailure { error ->
                     when(error) {
-                        is Character.Name.BlankException -> bot.sendMessage(
+                        is CharacterPage.Title.BlankException -> bot.sendMessage(
                             chatId = ChatId.fromId(userId),
-                            text = intl.translate("command.new.character.input.title.blank.message")
+                            text = intl.translate("command.new.character.page.title.blank.message")
                         )
-                        is Character.Name.LengthException -> bot.sendMessage(
+                        is CharacterPage.Title.LengthException -> bot.sendMessage(
                             chatId = ChatId.fromId(userId),
-                            text = intl.translate("command.new.character.input.title.length.message")
+                            text = intl.translate("command.new.character.page.title.length.message")
                         )
-                        is Character.Name.InvalidException -> bot.sendMessage(
+                        is CharacterPage.Title.InvalidException -> bot.sendMessage(
                             chatId = ChatId.fromId(userId),
-                            text = intl.translate("command.new.character.input.title.invalid.message")
+                            text = intl.translate("command.new.character.page.title.invalid.message")
                         )
-                        is Character.Name.ExistsException -> bot.sendMessage(
+                        is CharacterPage.Title.ExistsException -> bot.sendMessage(
                             chatId = ChatId.fromId(userId),
-                            text = intl.translate("command.new.character.input.title.exists.message")
+                            text = intl.translate("command.new.character.page.title.exists.message")
                         )
-                        is Character.Description.BlankException -> bot.sendMessage(
+                        is CharacterPage.Content.BlankException -> bot.sendMessage(
                             chatId = ChatId.fromId(userId),
-                            text = intl.translate("command.new.character.input.content.blank.message")
+                            text = intl.translate("command.new.character.page.content.blank.message")
                         )
-                        is Character.Description.LengthException -> bot.sendMessage(
+                        is CharacterPage.Content.LengthException -> bot.sendMessage(
                             chatId = ChatId.fromId(userId),
-                            text = intl.translate("command.new.character.input.content.length.message")
+                            text = intl.translate("command.new.character.page.content.length.message")
                         )
                         else -> {
                             bot.sendMessage(
@@ -394,7 +394,7 @@ fun main() {
                                 replyMarkup = ReplyKeyboardRemove()
                             )
 
-                            currentCharacterMap.remove(userId)
+                            currentCharacterPageMap.remove(userId)
                             currentGameMap.remove(userId)
                             currentCommandMap.remove(userId)
                         }
@@ -409,7 +409,7 @@ fun main() {
 
                 val command = currentCommandMap[userId] ?: return@command
 
-                currentCharacterMap.remove(userId)
+                currentCharacterPageMap.remove(userId)
                 currentGameMap.remove(userId)
                 currentCommandMap.remove(userId)
 

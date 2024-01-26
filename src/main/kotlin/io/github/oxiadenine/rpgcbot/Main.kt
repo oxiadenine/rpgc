@@ -28,6 +28,8 @@ enum class Command {
     START,
     NEW_CHAR_PAGE,
     EDIT_CHAR_PAGE,
+    NEW_CHAR_RANK_PAGE,
+    EDIT_CHAR_RANK_PAGE,
     CANCEL;
 
     override fun toString() = name.replace("_", "").lowercase()
@@ -60,8 +62,6 @@ fun main() {
                 })
             }
             install(DefaultRequest) {
-                url("https://api.telegra.ph/")
-
                 contentType(ContentType.Application.Json)
             }
 
@@ -124,53 +124,66 @@ fun main() {
 
                     val command = currentCommandMap[userId] ?: return@callbackQuery
 
-                    when (command) {
-                        Command.NEW_CHAR_PAGE -> {
-                            currentGameMap[userId] = game
+                    currentCharacterPageMap[userId] = CharacterPage()
 
-                            bot.sendMessage(
-                                chatId = ChatId.fromId(userId),
-                                text = intl.translate(id = "command.new.character.page.title.message")
-                            )
-                        }
-                        Command.EDIT_CHAR_PAGE -> {
-                            telegraphApi.getPageList(TelegraphApi.GetPageList(accessToken = telegraphAccessToken))
-                                .onSuccess { pageList ->
-                                    val characterPages = pageList.pages
-                                        .filter { page -> page.path.contains(game.code) }
-                                        .map { page ->
-                                            CharacterPage().apply {
-                                                path = page.path
-                                                title = page.title
-                                            }
-                                        }
+                    runCatching {
+                        when (command) {
+                            Command.NEW_CHAR_PAGE, Command.NEW_CHAR_RANK_PAGE -> {
+                                currentGameMap[userId] = game
 
-                                    if (characterPages.isEmpty()) {
-                                        bot.sendMessage(
-                                            chatId = ChatId.fromId(userId),
-                                            text = intl.translate(id = "command.game.list.empty.message")
-                                        )
-                                    } else {
-                                        currentGameMap[userId] = game
+                                bot.sendMessage(
+                                    chatId = ChatId.fromId(userId),
+                                    text = intl.translate(id = "command.new.character.page.title.message")
+                                )
+                            }
+                            Command.EDIT_CHAR_PAGE, Command.EDIT_CHAR_RANK_PAGE -> {
+                                val pageList = telegraphApi.getPageList(TelegraphApi.GetPageList(
+                                    accessToken = telegraphAccessToken
+                                )).getOrThrow()
 
-                                        bot.sendMessage(
-                                            chatId = ChatId.fromId(userId),
-                                            text = intl.translate(id = "command.edit.character.page.list.message"),
-                                            replyMarkup = CharacterPageKeyboardReplyMarkup.create(characterPages)
-                                        )
+                                val characterPages = if (command.name == Command.EDIT_CHAR_RANK_PAGE.name) {
+                                    pageList.pages.filter { page ->
+                                        page.path.contains(game.code) &&
+                                                page.path.contains(CharacterPage.Paths.RANKING.name, ignoreCase = true)
                                     }
-                                }.onFailure {
+                                } else {
+                                    pageList.pages.filter { page -> page.path.contains(game.code) &&
+                                            !page.path.contains(CharacterPage.Paths.RANKING.name, ignoreCase = true)
+                                    }
+                                }.map { page ->
+                                    CharacterPage().apply {
+                                        path = page.path
+                                        title = page.title
+                                        isRanking = command.name == Command.EDIT_CHAR_RANK_PAGE.name
+                                    }
+                                }
+
+                                if (characterPages.isEmpty()) {
                                     bot.sendMessage(
                                         chatId = ChatId.fromId(userId),
-                                        text = intl.translate(id = "command.error.message")
+                                        text = intl.translate(id = "command.game.list.empty.message")
                                     )
+                                } else {
+                                    currentGameMap[userId] = game
 
-                                    currentCharacterPageMap.remove(userId)
-                                    currentGameMap.remove(userId)
-                                    currentCommandMap.remove(userId)
+                                    bot.sendMessage(
+                                        chatId = ChatId.fromId(userId),
+                                        text = intl.translate(id = "command.edit.character.page.list.message"),
+                                        replyMarkup = CharacterPageKeyboardReplyMarkup.create(characterPages)
+                                    )
                                 }
+                            }
+                            else -> return@callbackQuery
                         }
-                        else -> return@callbackQuery
+                    }.onFailure {
+                        bot.sendMessage(
+                            chatId = ChatId.fromId(userId),
+                            text = intl.translate(id = "command.error.message")
+                        )
+
+                        currentCharacterPageMap.remove(userId)
+                        currentGameMap.remove(userId)
+                        currentCommandMap.remove(userId)
                     }
                 }
             }
@@ -183,11 +196,116 @@ fun main() {
                 val command = currentCommandMap[userId] ?: return@message
                 val game = currentGameMap[userId] ?: return@message
 
-                var characterPage = currentCharacterPageMap[userId]
+                val characterPage = currentCharacterPageMap[userId] ?: return@message
+
+                if (characterPage.content.isNotEmpty()) return@message
 
                 runCatching {
-                    if (characterPage != null) {
-                        characterPage!!.content = CharacterPage.Content(
+                    if (characterPage.title.isEmpty()) {
+                        when (command) {
+                            Command.NEW_CHAR_PAGE, Command.NEW_CHAR_RANK_PAGE -> {
+                                val characterPageTitle = CharacterPage.Title(message.text!!).value
+
+                                val pageList = telegraphApi.getPageList(TelegraphApi.GetPageList(
+                                    accessToken = telegraphAccessToken
+                                )).getOrThrow()
+
+                                val pageExists = if (command.name == Command.NEW_CHAR_RANK_PAGE.name) {
+                                    pageList.pages.filter { page -> page.path.contains(game.code) &&
+                                            page.path.contains(CharacterPage.Paths.RANKING.name, ignoreCase = true)
+                                    }
+                                } else {
+                                    pageList.pages.filter { page -> page.path.contains(game.code) &&
+                                            !page.path.contains(CharacterPage.Paths.RANKING.name, ignoreCase = true)
+                                    }
+                                }.any { page -> page.title.equals(characterPageTitle, ignoreCase = true) }
+
+                                if (pageExists) {
+                                    throw CharacterPage.Title.ExistsException()
+                                }
+
+                                characterPage.title = characterPageTitle.lowercase().trim().replaceFirstChar { it.uppercase() }
+                                characterPage.isRanking = command.name == Command.NEW_CHAR_RANK_PAGE.name
+
+                                bot.sendMessage(
+                                    chatId = ChatId.fromId(userId),
+                                    text = intl.translate(
+                                        id = "command.new.character.page.content.message",
+                                        value = "title" to characterPage.title
+                                    )
+                                )
+                            }
+                            Command.EDIT_CHAR_PAGE, Command.EDIT_CHAR_RANK_PAGE -> {
+                                val characterPageTitle = message.text!!
+
+                                val pageList = telegraphApi.getPageList(TelegraphApi.GetPageList(
+                                    accessToken = telegraphAccessToken
+                                )).getOrThrow()
+
+                                val page = if (command.name == Command.EDIT_CHAR_RANK_PAGE.name) {
+                                    pageList.pages.filter { page -> page.path.contains(game.code) &&
+                                            page.path.contains(CharacterPage.Paths.RANKING.name, ignoreCase = true)
+                                    }
+                                } else {
+                                    pageList.pages.filter { page -> page.path.contains(game.code) &&
+                                            !page.path.contains(CharacterPage.Paths.RANKING.name, ignoreCase = true)
+                                    }
+                                }.firstOrNull { page -> page.title.equals(characterPageTitle, ignoreCase = true) }?.let { page ->
+                                    telegraphApi.getPage(page.path, TelegraphApi.GetPage()).getOrThrow()
+                                } ?: return@message
+
+                                val characterPageContent = buildString {
+                                    page.content!!.map { node ->
+                                        if (node.jsonObject["tag"]!!.jsonPrimitive.content != "figure") {
+                                            append("<${node.jsonObject["tag"]!!.jsonPrimitive.content}>")
+                                            node.jsonObject["children"]?.jsonArray?.let { children ->
+                                                if (children.first() is JsonObject) appendLine()
+                                                children.map { node ->
+                                                    when (node) {
+                                                        is JsonObject -> {
+                                                            append("<${node.jsonObject["tag"]!!.jsonPrimitive.content}>")
+                                                            node.jsonObject["children"]?.jsonArray?.let { children ->
+                                                                children.map { element ->
+                                                                    append(element.jsonPrimitive.content)
+                                                                }
+                                                            }
+                                                            append("</${node.jsonObject["tag"]!!.jsonPrimitive.content}>")
+                                                            appendLine()
+                                                        }
+                                                        else -> append(node.jsonPrimitive.content)
+                                                    }
+                                                }
+                                                append("</${node.jsonObject["tag"]!!.jsonPrimitive.content}>")
+                                                appendLine()
+                                            } ?: appendLine()
+                                        } else append("")
+                                    }
+                                }
+
+                                characterPage.path = page.path
+                                characterPage.title = page.title
+                                characterPage.isRanking = command.name == Command.EDIT_CHAR_RANK_PAGE.name
+
+                                bot.sendMessage(
+                                    chatId = ChatId.fromId(userId),
+                                    text = intl.translate(
+                                        id = "command.edit.character.page.content.message1",
+                                        value = "title" to characterPage.title
+                                    ),
+                                    replyMarkup = ReplyKeyboardRemove()
+                                )
+
+                                bot.sendMessage(chatId = ChatId.fromId(userId), text = characterPageContent)
+
+                                bot.sendMessage(
+                                    chatId = ChatId.fromId(userId),
+                                    text = intl.translate(id = "command.edit.character.page.content.message2")
+                                )
+                            }
+                            else -> return@message
+                        }
+                    } else {
+                        characterPage.content = CharacterPage.Content(
                             Jsoup.parse(message.text!!).body().select(">*")
                                 .joinToString(",") { element ->
                                     if (element.tagName() == "ol" || element.tagName() == "ul") {
@@ -213,40 +331,54 @@ fun main() {
 
                         when (command) {
                             Command.NEW_CHAR_PAGE -> {
-                                val characterPageTitle =  Normalizer.normalize(characterPage!!.title, Normalizer.Form.NFKD)
-                                    .replace("\\p{M}".toRegex(), "")
-                                    .lowercase()
-                                    .replace(" ", "-")
-
-                                telegraphApi.createPage(TelegraphApi.CreatePage(
-                                    accessToken = telegraphAccessToken,
-                                    title = "${game.code}-${characterPageTitle}",
-                                    authorName = telegraphUsername,
-                                    content = "[${characterPage!!.content}]"
-                                )).onSuccess { page ->
-                                    characterPage!!.path = page.path
-
-                                    telegraphApi.editPage(characterPage!!.path, TelegraphApi.EditPage(
-                                        accessToken = telegraphAccessToken,
-                                        title = characterPage!!.title,
-                                        content = "[${characterPage!!.content}]",
-                                        authorName = telegraphUsername
-                                    )).getOrThrow()
-                                }.onSuccess {
-                                    bot.sendMessage(
-                                        chatId = ChatId.fromId(userId),
-                                        text = intl.translate(
-                                            id = "command.new.character.page.success.message",
-                                            value = "title" to characterPage!!.title
-                                        )
-                                    )
+                                val characterPageTitle = buildString {
+                                    append(game.code)
+                                    append("-")
+                                    append(Normalizer.normalize(characterPage.title, Normalizer.Form.NFKD)
+                                        .replace("\\p{M}".toRegex(), "")
+                                        .lowercase()
+                                        .replace(" ", "-"))
                                 }
+
+                                val page = telegraphApi.createPage(TelegraphApi.CreatePage(
+                                    accessToken = telegraphAccessToken,
+                                    title = characterPageTitle,
+                                    authorName = telegraphUsername,
+                                    content = "[${characterPage.content}]"
+                                )).getOrThrow()
+
+                                characterPage.path = page.path
+
+                                telegraphApi.editPage(characterPage.path, TelegraphApi.EditPage(
+                                    accessToken = telegraphAccessToken,
+                                    title = characterPage.title,
+                                    content = "[${characterPage.content}]",
+                                    authorName = telegraphUsername
+                                )).getOrThrow()
+
+                                bot.sendMessage(
+                                    chatId = ChatId.fromId(userId),
+                                    text = intl.translate(
+                                        id = "command.new.character.page.success.message",
+                                        value = "title" to characterPage.title
+                                    )
+                                )
+
+                                currentCharacterPageMap.remove(userId)
+                                currentGameMap.remove(userId)
+                                currentCommandMap.remove(userId)
+                            }
+                            Command.NEW_CHAR_RANK_PAGE -> {
+                                bot.sendMessage(
+                                    chatId = ChatId.fromId(userId),
+                                    text = intl.translate(id = "command.new.character.page.content.image.message")
+                                )
                             }
                             Command.EDIT_CHAR_PAGE -> {
-                                telegraphApi.editPage(characterPage!!.path, TelegraphApi.EditPage(
+                                telegraphApi.editPage(characterPage.path, TelegraphApi.EditPage(
                                     accessToken = telegraphAccessToken,
-                                    title = characterPage!!.title,
-                                    content = "[${characterPage!!.content}]",
+                                    title = characterPage.title,
+                                    content = "[${characterPage.content}]",
                                     authorName = telegraphUsername
                                 )).getOrThrow()
 
@@ -254,112 +386,18 @@ fun main() {
                                     chatId = ChatId.fromId(userId),
                                     text = intl.translate(
                                         id = "command.edit.character.page.success.message",
-                                        value = "title" to characterPage!!.title
+                                        value = "title" to characterPage.title
                                     )
                                 )
+
+                                currentCharacterPageMap.remove(userId)
+                                currentGameMap.remove(userId)
+                                currentCommandMap.remove(userId)
                             }
-                            else -> return@message
-                        }
-
-                        currentCharacterPageMap.remove(userId)
-                        currentGameMap.remove(userId)
-                        currentCommandMap.remove(userId)
-                    } else {
-                        when (command) {
-                            Command.NEW_CHAR_PAGE -> {
-                                val characterPageTitle = CharacterPage.Title(message.text!!).value
-
-                                val pageList = telegraphApi.getPageList(TelegraphApi.GetPageList(
-                                    accessToken = telegraphAccessToken
-                                )).getOrThrow()
-
-                                val pageExists = pageList.pages
-                                    .filter { page -> page.path.contains(game.code) }
-                                    .any { page -> page.title.equals(characterPageTitle, ignoreCase = true) }
-
-                                if (pageExists) {
-                                    throw CharacterPage.Title.ExistsException()
-                                }
-
-                                characterPage = CharacterPage().apply {
-                                    title = characterPageTitle.lowercase().trim().split(" ").joinToString(" ") { part ->
-                                        part.replaceFirstChar { it.uppercase() }
-                                    }
-                                }
-
-                                currentCharacterPageMap[userId] = characterPage!!
-
+                            Command.EDIT_CHAR_RANK_PAGE -> {
                                 bot.sendMessage(
                                     chatId = ChatId.fromId(userId),
-                                    text = intl.translate(
-                                        id = "command.new.character.page.content.message",
-                                        value = "title" to characterPage!!.title
-                                    )
-                                )
-                            }
-                            Command.EDIT_CHAR_PAGE -> {
-                                val characterPageTitle = message.text!!
-
-                                val pageList = telegraphApi.getPageList(TelegraphApi.GetPageList(
-                                    accessToken = telegraphAccessToken
-                                )).getOrThrow()
-
-                                val page = pageList.pages
-                                    .filter { page -> page.path.contains(game.code) }
-                                    .firstOrNull { page ->
-                                        page.title.equals(characterPageTitle, ignoreCase = true)
-                                    }?.let { page ->
-                                        telegraphApi.getPage(page.path, TelegraphApi.GetPage()).getOrThrow()
-                                    } ?: return@message
-
-                                val characterPageContent = buildString {
-                                    page.content!!.map { node ->
-                                        append("<${node.jsonObject["tag"]!!.jsonPrimitive.content}>")
-                                        node.jsonObject["children"]?.jsonArray?.let { children ->
-                                            if (children.first() is JsonObject) appendLine()
-                                            children.map { node ->
-                                                when (node) {
-                                                    is JsonObject -> {
-                                                        append("<${node.jsonObject["tag"]!!.jsonPrimitive.content}>")
-                                                        node.jsonObject["children"]?.jsonArray?.let { children ->
-                                                            children.map { element ->
-                                                                append(element.jsonPrimitive.content)
-                                                            }
-                                                        }
-                                                        append("</${node.jsonObject["tag"]!!.jsonPrimitive.content}>")
-                                                        appendLine()
-                                                    }
-                                                    else -> append(node.jsonPrimitive.content)
-                                                }
-                                            }
-                                            append("</${node.jsonObject["tag"]!!.jsonPrimitive.content}>")
-                                            appendLine()
-                                        } ?: appendLine()
-                                    }
-                                }
-
-                                characterPage = CharacterPage().apply {
-                                    path = page.path
-                                    title = page.title
-                                    content = characterPageContent
-                                }
-
-                                currentCharacterPageMap[userId] = characterPage!!
-
-                                bot.sendMessage(
-                                    chatId = ChatId.fromId(userId),
-                                    text = intl.translate(
-                                        id = "command.edit.character.page.content.message1",
-                                        value = "title" to characterPage!!.title
-                                    ),
-                                    replyMarkup = ReplyKeyboardRemove()
-                                )
-
-                                bot.sendMessage(chatId = ChatId.fromId(userId), text = characterPage!!.content)
-
-                                bot.sendMessage(
-                                    chatId = ChatId.fromId(userId),
-                                    text = intl.translate(id = "command.edit.character.page.content.message2")
+                                    text = intl.translate(id = "command.edit.character.page.content.image.message")
                                 )
                             }
                             else -> return@message
@@ -403,6 +441,114 @@ fun main() {
                             currentCommandMap.remove(userId)
                         }
                     }
+                }
+            }
+
+            message(Filter.Photo) {
+                val intl = Intl(message.from?.languageCode ?: Intl.DEFAULT_LOCALE)
+
+                val userId = message.chat.id
+
+                val command = currentCommandMap[userId] ?: return@message
+                val game = currentGameMap[userId] ?: return@message
+
+                val characterPage = currentCharacterPageMap[userId] ?: return@message
+
+                if (characterPage.content.isEmpty()) return@message
+
+                val imageUrl = bot.getFile(message.photo!!.last().fileId).first?.let { response ->
+                    if (response.isSuccessful) {
+                        bot.downloadFile(response.body()?.result!!.filePath!!)
+                    } else error(response.message())
+                }?.first?.let { response ->
+                    if (response.isSuccessful) {
+                        telegraphApi.uploadImage(response.body()!!.bytes())
+                    } else error(response.message())
+                } ?: return@message
+
+                characterPage.content = buildString {
+                    append("${characterPage.content},")
+                    append(Json.encodeToString(TelegraphApi.Node(
+                        tag = "figure",
+                        children = listOf(TelegraphApi.NodeElement(
+                            tag = "img",
+                            attrs = TelegraphApi.Attributes(
+                                src = "https://telegra.ph$imageUrl"
+                            )
+                        ))
+                    )))
+                }
+
+                runCatching {
+                    when (command) {
+                        Command.NEW_CHAR_RANK_PAGE -> {
+                            val characterPageTitle = buildString {
+                                append(game.code)
+                                append("-")
+                                append(Normalizer.normalize(characterPage.title, Normalizer.Form.NFKD)
+                                    .replace("\\p{M}".toRegex(), "")
+                                    .lowercase()
+                                    .replace(" ", "-"))
+                                append("-")
+                                append(CharacterPage.Paths.RANKING.name.lowercase())
+                            }
+
+                            val page = telegraphApi.createPage(TelegraphApi.CreatePage(
+                                accessToken = telegraphAccessToken,
+                                title = characterPageTitle,
+                                authorName = telegraphUsername,
+                                content = "[${characterPage.content}]"
+                            )).getOrThrow()
+
+                            characterPage.path = page.path
+
+                            telegraphApi.editPage(characterPage.path, TelegraphApi.EditPage(
+                                accessToken = telegraphAccessToken,
+                                title = characterPage.title,
+                                content = "[${characterPage.content}]",
+                                authorName = telegraphUsername
+                            )).getOrThrow()
+
+                            bot.sendMessage(
+                                chatId = ChatId.fromId(userId),
+                                text = intl.translate(
+                                    id = "command.new.character.page.success.message",
+                                    value = "title" to characterPage.title
+                                )
+                            )
+                        }
+                        Command.EDIT_CHAR_RANK_PAGE -> {
+                            telegraphApi.editPage(characterPage.path, TelegraphApi.EditPage(
+                                accessToken = telegraphAccessToken,
+                                title = characterPage.title,
+                                content = "[${characterPage.content}]",
+                                authorName = telegraphUsername
+                            )).getOrThrow()
+
+                            bot.sendMessage(
+                                chatId = ChatId.fromId(userId),
+                                text = intl.translate(
+                                    id = "command.edit.character.page.success.message",
+                                    value = "title" to characterPage.title
+                                )
+                            )
+                        }
+                        else -> return@message
+                    }
+
+                    currentCharacterPageMap.remove(userId)
+                    currentGameMap.remove(userId)
+                    currentCommandMap.remove(userId)
+                }.onFailure {
+                    bot.sendMessage(
+                        chatId = ChatId.fromId(userId),
+                        text = intl.translate("command.error.message"),
+                        replyMarkup = ReplyKeyboardRemove()
+                    )
+
+                    currentCharacterPageMap.remove(userId)
+                    currentGameMap.remove(userId)
+                    currentCommandMap.remove(userId)
                 }
             }
 

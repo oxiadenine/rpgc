@@ -4,6 +4,8 @@ import java.lang.IllegalArgumentException
 import java.lang.IllegalStateException
 
 class CharacterPage {
+    enum class Paths { RANKING }
+
     @JvmInline
     value class Title(val value: String) {
         class BlankException : IllegalArgumentException()
@@ -45,4 +47,5 @@ class CharacterPage {
     var path = ""
     var title = ""
     var content = ""
+    var isRanking = false
 }

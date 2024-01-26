@@ -15,6 +15,7 @@ dependencies {
     val ktorVersion = properties["ktor.version"] as String
     val typesafeConfigVersion = properties["typesafe-config.version"] as String
     val jsoupVersion = properties["jsoup.version"] as String
+    val retrofitVersion = properties["retrofit.version"] as String
     val kotlinTelegramBotVersion = properties["kotlin-telegram-bot.version"] as String
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$kotlinxCoroutinesVersion")
@@ -25,6 +26,7 @@ dependencies {
     implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
     implementation("com.typesafe:config:$typesafeConfigVersion")
     implementation("org.jsoup:jsoup:$jsoupVersion")
+    implementation("com.squareup.retrofit2:retrofit:$retrofitVersion")
     implementation("io.github.kotlin-telegram-bot.kotlin-telegram-bot:telegram:$kotlinTelegramBotVersion")
 
     testImplementation(kotlin("test"))

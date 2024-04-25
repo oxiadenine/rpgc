@@ -31,7 +31,7 @@ class TelegraphApi(private val httpClient: HttpClient) {
     )
 
     @Serializable
-    data class PageList(@SerialName("total_count") val totalCount: Int, val pages: Array<Page>)
+    data class PageList(@SerialName("total_count") val totalCount: Int, val pages: List<Page>)
 
     @Serializable
     data class Node(val tag: String, val children: List<NodeElement>? = null)

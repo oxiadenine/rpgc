@@ -188,6 +188,24 @@ fun main() {
                 }
             }
 
+            command(Command.CANCEL.toString()) {
+                val intl = Intl(message.from?.languageCode ?: Intl.DEFAULT_LOCALE)
+
+                val userId = message.chat.id
+
+                val command = currentCommandMap[userId] ?: return@command
+
+                currentCharacterPageMap.remove(userId)
+                currentGameMap.remove(userId)
+                currentCommandMap.remove(userId)
+
+                bot.sendMessage(
+                    chatId = ChatId.fromId(message.chat.id),
+                    text = intl.translate(id = "command.cancel.message", value = "command" to command.toString()),
+                    replyMarkup = ReplyKeyboardRemove()
+                )
+            }
+
             message(Filter.Text) {
                 val intl = Intl(message.from?.languageCode ?: Intl.DEFAULT_LOCALE)
 
@@ -550,24 +568,6 @@ fun main() {
                     currentGameMap.remove(userId)
                     currentCommandMap.remove(userId)
                 }
-            }
-
-            command(Command.CANCEL.toString()) {
-                val intl = Intl(message.from?.languageCode ?: Intl.DEFAULT_LOCALE)
-
-                val userId = message.chat.id
-
-                val command = currentCommandMap[userId] ?: return@command
-
-                currentCharacterPageMap.remove(userId)
-                currentGameMap.remove(userId)
-                currentCommandMap.remove(userId)
-
-                bot.sendMessage(
-                    chatId = ChatId.fromId(message.chat.id),
-                    text = intl.translate(id = "command.cancel.message", value = "command" to command.toString()),
-                    replyMarkup = ReplyKeyboardRemove()
-                )
             }
 
             inlineQuery {

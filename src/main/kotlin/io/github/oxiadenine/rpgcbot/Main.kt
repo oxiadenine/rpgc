@@ -45,28 +45,28 @@ fun main() {
     val telegraphUsername = System.getenv("TELEGRAPH_USERNAME") ?: ""
     val telegraphAccessToken = System.getenv("TELEGRAPH_ACCESS_TOKEN") ?: ""
 
+    val userIds = userIdWhitelist.split(",").map { userId -> userId.toLong() }
+    val games = gameList.split(",").map { gameName -> Game(
+        code = gameName.lowercase().split(" ").joinToString("") { "${it[0]}" },
+        name = gameName
+    )}
+
+    val telegraphApi = TelegraphApi(HttpClient(CIO) {
+        install(ContentNegotiation) {
+            json(Json {
+                explicitNulls = false
+                encodeDefaults = true
+            })
+        }
+        install(DefaultRequest) {
+            contentType(ContentType.Application.Json)
+        }
+
+        expectSuccess = true
+    })
+
     val rpgcBot = bot {
         token = telegramBotToken
-
-        val userIds = userIdWhitelist.split(",").map { userId -> userId.toLong() }
-        val games = gameList.split(",").map { gameName -> Game(
-            code = gameName.lowercase().split(" ").joinToString("") { "${it[0]}" },
-            name = gameName
-        )}
-
-        val telegraphApi = TelegraphApi(HttpClient(CIO) {
-            install(ContentNegotiation) {
-                json(Json {
-                    explicitNulls = false
-                    encodeDefaults = true
-                })
-            }
-            install(DefaultRequest) {
-                contentType(ContentType.Application.Json)
-            }
-
-            expectSuccess = true
-        })
 
         val currentCommandMap = ConcurrentHashMap<Long, Command>()
         val currentGameMap = ConcurrentHashMap<Long, Game>()
@@ -74,16 +74,19 @@ fun main() {
 
         dispatch {
             command(Command.START.toString()) {
-                val intl = Intl(message.from?.languageCode ?: Intl.DEFAULT_LOCALE)
+                val intl = message.from?.languageCode?.let { locale -> Intl(locale) } ?: Intl()
 
                 val userId = message.chat.id
 
-                bot.sendMessage(chatId = ChatId.fromId(userId), text = intl.translate(id = "command.start.message"))
+                bot.sendMessage(
+                    chatId = ChatId.fromId(userId),
+                    text = intl.translate(id = "command.start.message")
+                )
             }
 
             Command.entries.drop(1).dropLast(1).map { command ->
                 command(command.toString()) {
-                    val intl = Intl(message.from?.languageCode ?: Intl.DEFAULT_LOCALE)
+                    val intl = message.from?.languageCode?.let { locale -> Intl(locale) } ?: Intl()
 
                     val userId = message.chat.id
 
@@ -116,9 +119,27 @@ fun main() {
                 }
             }
 
+            command(Command.CANCEL.toString()) {
+                val intl = message.from?.languageCode?.let { locale -> Intl(locale) } ?: Intl()
+
+                val userId = message.chat.id
+
+                val command = currentCommandMap[userId] ?: return@command
+
+                currentCharacterPageMap.remove(userId)
+                currentGameMap.remove(userId)
+                currentCommandMap.remove(userId)
+
+                bot.sendMessage(
+                    chatId = ChatId.fromId(message.chat.id),
+                    text = intl.translate(id = "command.cancel.message", value = "command" to command.toString()),
+                    replyMarkup = ReplyKeyboardRemove()
+                )
+            }
+
             games.map { game ->
                 callbackQuery(game.code) {
-                    val intl = Intl(callbackQuery.from.languageCode ?: Intl.DEFAULT_LOCALE)
+                    val intl = callbackQuery.from.languageCode?.let { locale -> Intl(locale) } ?: Intl()
 
                     val userId = callbackQuery.message?.chat?.id ?: return@callbackQuery
 
@@ -188,26 +209,8 @@ fun main() {
                 }
             }
 
-            command(Command.CANCEL.toString()) {
-                val intl = Intl(message.from?.languageCode ?: Intl.DEFAULT_LOCALE)
-
-                val userId = message.chat.id
-
-                val command = currentCommandMap[userId] ?: return@command
-
-                currentCharacterPageMap.remove(userId)
-                currentGameMap.remove(userId)
-                currentCommandMap.remove(userId)
-
-                bot.sendMessage(
-                    chatId = ChatId.fromId(message.chat.id),
-                    text = intl.translate(id = "command.cancel.message", value = "command" to command.toString()),
-                    replyMarkup = ReplyKeyboardRemove()
-                )
-            }
-
             message(Filter.Text) {
-                val intl = Intl(message.from?.languageCode ?: Intl.DEFAULT_LOCALE)
+                val intl = message.from?.languageCode?.let { locale -> Intl(locale) } ?: Intl()
 
                 val userId = message.chat.id
 
@@ -463,7 +466,7 @@ fun main() {
             }
 
             message(Filter.Photo) {
-                val intl = Intl(message.from?.languageCode ?: Intl.DEFAULT_LOCALE)
+                val intl = message.from?.languageCode?.let { locale -> Intl(locale) } ?: Intl()
 
                 val userId = message.chat.id
 
@@ -571,7 +574,7 @@ fun main() {
             }
 
             inlineQuery {
-                val intl = Intl(inlineQuery.from.languageCode ?: Intl.DEFAULT_LOCALE)
+                val intl = inlineQuery.from.languageCode?.let { locale -> Intl(locale) } ?: Intl()
 
                 val userId = inlineQuery.from.id
 

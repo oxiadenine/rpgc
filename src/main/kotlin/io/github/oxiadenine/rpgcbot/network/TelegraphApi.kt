@@ -17,6 +17,16 @@ class TelegraphApi(private val httpClient: HttpClient) {
     }
 
     @Serializable
+    data class Account(
+        @SerialName("short_name") val shortName: String? = null,
+        @SerialName("author_name") val authorName: String? = null,
+        @SerialName("author_url") val authorUrl: String? = null,
+        @SerialName("access_token") val accessToken: String? = null,
+        @SerialName("auth_url") val authUrl: String? = null,
+        @SerialName("page_count") val pageCount: Int? = null
+    )
+
+    @Serializable
     data class Page(
         val path: String,
         val url: String,
@@ -41,6 +51,12 @@ class TelegraphApi(private val httpClient: HttpClient) {
 
     @Serializable
     data class Attributes(val src: String? = null)
+
+    @Serializable
+    data class GetAccountInfo(
+        @SerialName("access_token") val accessToken: String,
+        val fields: List<String>
+    )
 
     @Serializable
     data class CreatePage(
@@ -73,6 +89,9 @@ class TelegraphApi(private val httpClient: HttpClient) {
     )
 
     @Serializable
+    data class AccountResponse(val ok: Boolean, val result: Account?, val error: String?)
+
+    @Serializable
     data class PageResponse(val ok: Boolean, val result: Page?, val error: String?)
 
     @Serializable
@@ -80,6 +99,10 @@ class TelegraphApi(private val httpClient: HttpClient) {
 
     @Serializable
     data class UploadImageResponse(val src: String)
+
+    suspend fun getAccountInfo(getAccountInfo: GetAccountInfo) = runCatching {
+        handleAccountResponse(httpClient.post("$API_URL/getAccountInfo") { setBody(getAccountInfo) })
+    }
 
     suspend fun createPage(createPage: CreatePage) = runCatching {
         handlePageResponse(httpClient.post("$API_URL/createPage") { setBody(createPage) })
@@ -106,6 +129,16 @@ class TelegraphApi(private val httpClient: HttpClient) {
             })
         }
     ).body<List<UploadImageResponse>>()[0].src
+
+    private suspend fun handleAccountResponse(httpResponse: HttpResponse): Account {
+        val accountResponse = httpResponse.body<AccountResponse>()
+
+        if (!accountResponse.ok) {
+            error(accountResponse.error!!)
+        }
+
+        return accountResponse.result!!
+    }
 
     private suspend fun handlePageResponse(httpResponse: HttpResponse): Page {
         val pageResponse = httpResponse.body<PageResponse>()

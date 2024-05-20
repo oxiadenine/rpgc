@@ -158,17 +158,35 @@ fun main() {
                                 )
                             }
                             Command.EDIT_CHAR_PAGE, Command.EDIT_CHAR_RANK_PAGE -> {
-                                val pageList = telegraphApi.getPageList(TelegraphApi.GetPageList(
-                                    accessToken = telegraphAccessToken
-                                )).getOrThrow()
+                                val pageCount = telegraphApi.getAccountInfo(TelegraphApi.GetAccountInfo(
+                                    accessToken = telegraphAccessToken,
+                                    fields = listOf("page_count")
+                                )).getOrThrow().pageCount!!
+
+                                val pages = mutableListOf<TelegraphApi.Page>()
+
+                                var offset = 0
+                                val limit = 50
+
+                                while (offset < pageCount) {
+                                    val pageList = telegraphApi.getPageList(TelegraphApi.GetPageList(
+                                        accessToken = telegraphAccessToken,
+                                        offset = offset,
+                                        limit = limit
+                                    )).getOrThrow()
+
+                                    pages.addAll(pageList.pages)
+
+                                    offset += limit
+                                }
 
                                 val characterPages = if (command.name == Command.EDIT_CHAR_RANK_PAGE.name) {
-                                    pageList.pages.filter { page ->
+                                    pages.filter { page ->
                                         page.path.contains(game.code) &&
                                                 page.path.contains(CharacterPage.Paths.RANKING.name, ignoreCase = true)
                                     }
                                 } else {
-                                    pageList.pages.filter { page -> page.path.contains(game.code) &&
+                                    pages.filter { page -> page.path.contains(game.code) &&
                                             !page.path.contains(CharacterPage.Paths.RANKING.name, ignoreCase = true)
                                     }
                                 }.map { page ->
@@ -223,20 +241,38 @@ fun main() {
 
                 runCatching {
                     if (characterPage.title.isEmpty()) {
+                        val pageCount = telegraphApi.getAccountInfo(TelegraphApi.GetAccountInfo(
+                            accessToken = telegraphAccessToken,
+                            fields = listOf("page_count")
+                        )).getOrThrow().pageCount!!
+
+                        val pages = mutableListOf<TelegraphApi.Page>()
+
+                        var offset = 0
+                        val limit = 50
+
+                        while (offset < pageCount) {
+                            val pageList = telegraphApi.getPageList(TelegraphApi.GetPageList(
+                                accessToken = telegraphAccessToken,
+                                offset = offset,
+                                limit = limit
+                            )).getOrThrow()
+
+                            pages.addAll(pageList.pages)
+
+                            offset += limit
+                        }
+
                         when (command) {
                             Command.NEW_CHAR_PAGE, Command.NEW_CHAR_RANK_PAGE -> {
                                 val characterPageTitle = CharacterPage.Title(message.text!!).value
 
-                                val pageList = telegraphApi.getPageList(TelegraphApi.GetPageList(
-                                    accessToken = telegraphAccessToken
-                                )).getOrThrow()
-
                                 val pageExists = if (command.name == Command.NEW_CHAR_RANK_PAGE.name) {
-                                    pageList.pages.filter { page -> page.path.contains(game.code) &&
+                                    pages.filter { page -> page.path.contains(game.code) &&
                                             page.path.contains(CharacterPage.Paths.RANKING.name, ignoreCase = true)
                                     }
                                 } else {
-                                    pageList.pages.filter { page -> page.path.contains(game.code) &&
+                                    pages.filter { page -> page.path.contains(game.code) &&
                                             !page.path.contains(CharacterPage.Paths.RANKING.name, ignoreCase = true)
                                     }
                                 }.any { page -> page.title.equals(characterPageTitle, ignoreCase = true) }
@@ -259,16 +295,12 @@ fun main() {
                             Command.EDIT_CHAR_PAGE, Command.EDIT_CHAR_RANK_PAGE -> {
                                 val characterPageTitle = message.text!!
 
-                                val pageList = telegraphApi.getPageList(TelegraphApi.GetPageList(
-                                    accessToken = telegraphAccessToken
-                                )).getOrThrow()
-
                                 val page = if (command.name == Command.EDIT_CHAR_RANK_PAGE.name) {
-                                    pageList.pages.filter { page -> page.path.contains(game.code) &&
+                                    pages.filter { page -> page.path.contains(game.code) &&
                                             page.path.contains(CharacterPage.Paths.RANKING.name, ignoreCase = true)
                                     }
                                 } else {
-                                    pageList.pages.filter { page -> page.path.contains(game.code) &&
+                                    pages.filter { page -> page.path.contains(game.code) &&
                                             !page.path.contains(CharacterPage.Paths.RANKING.name, ignoreCase = true)
                                     }
                                 }.firstOrNull { page -> page.title.equals(characterPageTitle, ignoreCase = true) }?.let { page ->
@@ -582,29 +614,48 @@ fun main() {
 
                 if (pageTitleQuery.isBlank() or pageTitleQuery.isEmpty()) return@inlineQuery
 
-                telegraphApi.getPageList(TelegraphApi.GetPageList(accessToken = telegraphAccessToken))
-                    .onSuccess { pageList ->
-                        val pageInlineQueryResults = pageList.pages
-                            .filter { page -> page.title.lowercase().contains(pageTitleQuery.lowercase()) }
-                            .map { page -> telegraphApi.getPage(page.path, TelegraphApi.GetPage()).getOrThrow() }
-                            .map { page ->
-                                InlineQueryResult.Article(
-                                    id = page.path,
-                                    title = page.title,
-                                    inputMessageContent = InputMessageContent.Text(page.url),
-                                    description = games.first { game ->
-                                        game.code == page.path.substringBefore("-")
-                                    }.name
-                                )
-                            }
+                telegraphApi.getAccountInfo(TelegraphApi.GetAccountInfo(
+                    accessToken = telegraphAccessToken,
+                    fields = listOf("page_count")
+                )).onSuccess { account ->
+                    val pages = mutableListOf<TelegraphApi.Page>()
 
-                        bot.answerInlineQuery(inlineQuery.id, pageInlineQueryResults)
-                    }.onFailure {
-                        bot.sendMessage(
-                            chatId = ChatId.fromId(userId),
-                            text = intl.translate(id = "command.error.message")
-                        )
+                    var offset = 0
+                    val limit = 50
+
+                    while (offset < account.pageCount!!) {
+                        val pageList = telegraphApi.getPageList(TelegraphApi.GetPageList(
+                            accessToken = telegraphAccessToken,
+                            offset = offset,
+                            limit = limit
+                        )).getOrThrow()
+
+                        pages.addAll(pageList.pages)
+
+                        offset += limit
                     }
+
+                    val pageInlineQueryResults = pages
+                        .filter { page -> page.title.lowercase().contains(pageTitleQuery.lowercase()) }
+                        .map { page -> telegraphApi.getPage(page.path, TelegraphApi.GetPage()).getOrThrow() }
+                        .map { page ->
+                            InlineQueryResult.Article(
+                                id = page.path,
+                                title = page.title,
+                                inputMessageContent = InputMessageContent.Text(page.url),
+                                description = games.first { game ->
+                                    game.code == page.path.substringBefore("-")
+                                }.name
+                            )
+                        }
+
+                    bot.answerInlineQuery(inlineQuery.id, pageInlineQueryResults)
+                }.onFailure {
+                    bot.sendMessage(
+                        chatId = ChatId.fromId(userId),
+                        text = intl.translate(id = "command.error.message")
+                    )
+                }
             }
         }
     }

@@ -17,7 +17,6 @@ import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import org.jsoup.Jsoup
@@ -37,7 +36,6 @@ enum class Command {
 
 data class Game(val code: String, val name: String)
 
-@OptIn(ExperimentalSerializationApi::class)
 fun main() {
     val telegramBotToken = System.getenv("TELEGRAM_BOT_TOKEN") ?: ""
     val userIdWhitelist = System.getenv("USER_ID_WHITELIST") ?: ""

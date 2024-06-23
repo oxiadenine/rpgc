@@ -8,6 +8,7 @@ import com.github.kotlintelegrambot.entities.ReplyKeyboardRemove
 import com.github.kotlintelegrambot.entities.inlinequeryresults.InlineQueryResult
 import com.github.kotlintelegrambot.entities.inlinequeryresults.InputMessageContent
 import com.github.kotlintelegrambot.extensions.filters.Filter
+import com.typesafe.config.ConfigFactory
 import io.github.oxiadenine.rpgcbot.network.TelegraphApi
 import io.github.oxiadenine.rpgcbot.view.CharacterPageKeyboardReplyMarkup
 import io.github.oxiadenine.rpgcbot.view.GameInlineKeyboardMarkup
@@ -37,14 +38,13 @@ enum class Command {
 data class Game(val code: String, val name: String)
 
 fun main() {
-    val telegramBotToken = System.getenv("TELEGRAM_BOT_TOKEN") ?: ""
-    val userIdWhitelist = System.getenv("USER_ID_WHITELIST") ?: ""
-    val gameList = System.getenv("GAME_NAME_LIST") ?: ""
-    val telegraphUsername = System.getenv("TELEGRAPH_USERNAME") ?: ""
-    val telegraphAccessToken = System.getenv("TELEGRAPH_ACCESS_TOKEN") ?: ""
+    val config = ConfigFactory.load()
 
-    val userIds = userIdWhitelist.split(",").map { userId -> userId.toLong() }
-    val games = gameList.split(",").map { gameName -> Game(
+    val botConfig = config.getConfig("bot")
+    val telegraphConfig = config.getConfig("telegraph")
+
+    val userIds = botConfig.getString("userWhitelist").split(",").map { userId -> userId.toLong() }
+    val games = botConfig.getString("gameList").split(",").map { gameName -> Game(
         code = gameName.lowercase().split(" ").joinToString("") { "${it[0]}" },
         name = gameName
     )}
@@ -64,7 +64,7 @@ fun main() {
     })
 
     val rpgcBot = bot {
-        token = telegramBotToken
+        token = botConfig.getString("token")
 
         val currentCommandMap = ConcurrentHashMap<Long, Command>()
         val currentGameMap = ConcurrentHashMap<Long, Game>()
@@ -157,7 +157,7 @@ fun main() {
                             }
                             Command.EDIT_CHAR_PAGE, Command.EDIT_CHAR_RANK_PAGE -> {
                                 val pageCount = telegraphApi.getAccountInfo(TelegraphApi.GetAccountInfo(
-                                    accessToken = telegraphAccessToken,
+                                    accessToken = telegraphConfig.getString("accessToken"),
                                     fields = listOf("page_count")
                                 )).getOrThrow().pageCount!!
 
@@ -168,7 +168,7 @@ fun main() {
 
                                 while (offset < pageCount) {
                                     val pageList = telegraphApi.getPageList(TelegraphApi.GetPageList(
-                                        accessToken = telegraphAccessToken,
+                                        accessToken = telegraphConfig.getString("accessToken"),
                                         offset = offset,
                                         limit = limit
                                     )).getOrThrow()
@@ -240,7 +240,7 @@ fun main() {
                 runCatching {
                     if (characterPage.title.isEmpty()) {
                         val pageCount = telegraphApi.getAccountInfo(TelegraphApi.GetAccountInfo(
-                            accessToken = telegraphAccessToken,
+                            accessToken = telegraphConfig.getString("accessToken"),
                             fields = listOf("page_count")
                         )).getOrThrow().pageCount!!
 
@@ -251,7 +251,7 @@ fun main() {
 
                         while (offset < pageCount) {
                             val pageList = telegraphApi.getPageList(TelegraphApi.GetPageList(
-                                accessToken = telegraphAccessToken,
+                                accessToken = telegraphConfig.getString("accessToken"),
                                 offset = offset,
                                 limit = limit
                             )).getOrThrow()
@@ -392,19 +392,19 @@ fun main() {
                                 }
 
                                 val page = telegraphApi.createPage(TelegraphApi.CreatePage(
-                                    accessToken = telegraphAccessToken,
+                                    accessToken = telegraphConfig.getString("accessToken"),
                                     title = characterPageTitle,
-                                    authorName = telegraphUsername,
+                                    authorName = telegraphConfig.getString("username"),
                                     content = "[${characterPage.content}]"
                                 )).getOrThrow()
 
                                 characterPage.path = page.path
 
                                 telegraphApi.editPage(characterPage.path, TelegraphApi.EditPage(
-                                    accessToken = telegraphAccessToken,
+                                    accessToken = telegraphConfig.getString("accessToken"),
                                     title = characterPage.title,
                                     content = "[${characterPage.content}]",
-                                    authorName = telegraphUsername
+                                    authorName = telegraphConfig.getString("username")
                                 )).getOrThrow()
 
                                 bot.sendMessage(
@@ -427,10 +427,10 @@ fun main() {
                             }
                             Command.EDIT_CHAR_PAGE -> {
                                 telegraphApi.editPage(characterPage.path, TelegraphApi.EditPage(
-                                    accessToken = telegraphAccessToken,
+                                    accessToken = telegraphConfig.getString("accessToken"),
                                     title = characterPage.title,
                                     content = "[${characterPage.content}]",
-                                    authorName = telegraphUsername
+                                    authorName = telegraphConfig.getString("username")
                                 )).getOrThrow()
 
                                 bot.sendMessage(
@@ -545,19 +545,19 @@ fun main() {
                             }
 
                             val page = telegraphApi.createPage(TelegraphApi.CreatePage(
-                                accessToken = telegraphAccessToken,
+                                accessToken = telegraphConfig.getString("accessToken"),
                                 title = characterPageTitle,
-                                authorName = telegraphUsername,
+                                authorName = telegraphConfig.getString("username"),
                                 content = "[${characterPage.content}]"
                             )).getOrThrow()
 
                             characterPage.path = page.path
 
                             telegraphApi.editPage(characterPage.path, TelegraphApi.EditPage(
-                                accessToken = telegraphAccessToken,
+                                accessToken = telegraphConfig.getString("accessToken"),
                                 title = characterPage.title,
                                 content = "[${characterPage.content}]",
-                                authorName = telegraphUsername
+                                authorName = telegraphConfig.getString("username")
                             )).getOrThrow()
 
                             bot.sendMessage(
@@ -570,10 +570,10 @@ fun main() {
                         }
                         Command.EDIT_CHAR_RANK_PAGE -> {
                             telegraphApi.editPage(characterPage.path, TelegraphApi.EditPage(
-                                accessToken = telegraphAccessToken,
+                                accessToken = telegraphConfig.getString("accessToken"),
                                 title = characterPage.title,
                                 content = "[${characterPage.content}]",
-                                authorName = telegraphUsername
+                                authorName = telegraphConfig.getString("username")
                             )).getOrThrow()
 
                             bot.sendMessage(
@@ -613,7 +613,7 @@ fun main() {
                 if (pageTitleQuery.isBlank() or pageTitleQuery.isEmpty()) return@inlineQuery
 
                 telegraphApi.getAccountInfo(TelegraphApi.GetAccountInfo(
-                    accessToken = telegraphAccessToken,
+                    accessToken = telegraphConfig.getString("accessToken"),
                     fields = listOf("page_count")
                 )).onSuccess { account ->
                     val pages = mutableListOf<TelegraphApi.Page>()
@@ -623,7 +623,7 @@ fun main() {
 
                     while (offset < account.pageCount!!) {
                         val pageList = telegraphApi.getPageList(TelegraphApi.GetPageList(
-                            accessToken = telegraphAccessToken,
+                            accessToken = telegraphConfig.getString("accessToken"),
                             offset = offset,
                             limit = limit
                         )).getOrThrow()

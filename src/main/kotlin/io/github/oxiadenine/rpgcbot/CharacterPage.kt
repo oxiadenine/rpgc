@@ -47,5 +47,7 @@ class CharacterPage {
     var path = ""
     var title = ""
     var content = ""
+    var url = ""
     var isRanking = false
+    var image: ByteArray? = null
 }

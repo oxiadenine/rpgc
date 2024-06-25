@@ -17,6 +17,9 @@ dependencies {
     val jsoupVersion = properties["jsoup.version"] as String
     val retrofitVersion = properties["retrofit.version"] as String
     val kotlinTelegramBotVersion = properties["kotlin-telegram-bot.version"] as String
+    val exposedVersion = properties["exposed.version"] as String
+    val hikaricpVersion = properties["hikaricp.version"] as String
+    val h2databaseVersion = properties["h2database.version"] as String
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$kotlinxCoroutinesVersion")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:$kotlinxSerializationVersion")
@@ -28,6 +31,9 @@ dependencies {
     implementation("org.jsoup:jsoup:$jsoupVersion")
     implementation("com.squareup.retrofit2:retrofit:$retrofitVersion")
     implementation("io.github.kotlin-telegram-bot.kotlin-telegram-bot:telegram:$kotlinTelegramBotVersion")
+    implementation("org.jetbrains.exposed:exposed-jdbc:$exposedVersion")
+    implementation("com.zaxxer:HikariCP:$hikaricpVersion")
+    implementation("com.h2database:h2:$h2databaseVersion")
 
     testImplementation(kotlin("test"))
 }

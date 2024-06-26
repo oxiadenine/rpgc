@@ -615,9 +615,12 @@ fun main() {
             }
 
             inlineQuery {
-                val pageTitleQuery = inlineQuery.query
+                var pageTitleQuery = inlineQuery.query
 
                 if (pageTitleQuery.isBlank() or pageTitleQuery.isEmpty()) return@inlineQuery
+
+                pageTitleQuery = Normalizer.normalize(pageTitleQuery, Normalizer.Form.NFKD)
+                    .replace("\\p{M}".toRegex(), "")
 
                 val characterPages = characterPageRepository.read().map { characterPageEntity ->
                     CharacterPage().apply {
@@ -630,7 +633,10 @@ fun main() {
                 }
 
                 val pageInlineQueryResults = characterPages
-                    .filter { characterPage -> characterPage.title.lowercase().contains(pageTitleQuery.lowercase()) }
+                    .filter { characterPage ->
+                        Normalizer.normalize(characterPage.title, Normalizer.Form.NFKD)
+                            .replace("\\p{M}".toRegex(), "").contains(pageTitleQuery, ignoreCase = true)
+                    }
                     .map { characterPage ->
                         InlineQueryResult.Article(
                             id = characterPage.path,

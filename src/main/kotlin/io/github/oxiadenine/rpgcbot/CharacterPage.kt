@@ -1,52 +1,51 @@
 package io.github.oxiadenine.rpgcbot
 
-import java.lang.IllegalArgumentException
-import java.lang.IllegalStateException
-
 class CharacterPage {
     enum class Paths { RANKING }
 
-    @JvmInline
-    value class Title(val value: String) {
-        class BlankException : IllegalArgumentException()
-        class LengthException : IllegalArgumentException()
-        class InvalidException : IllegalArgumentException()
-        class ExistsException : IllegalStateException()
+    class Title(title: String? = null) {
+        class BlankError : Error()
+        class LengthError : Error()
+        class InvalidError : Error()
+        class ExistsError : Error()
 
-        init {
-            if (value.isBlank()) {
-                throw BlankException()
+        val value: String = title?.let {
+            if (title.isBlank()) {
+                throw BlankError()
             }
 
-            if (value.length > 64) {
-                throw LengthException()
+            if (title.length > 64) {
+                throw LengthError()
             }
 
-            if (!value.matches("^([A-Za-zÀ-ÖØ-öø-ÿ0-9.]+\\s?)+$".toRegex())) {
-                throw InvalidException()
+            if (!title.matches("^([A-Za-zÀ-ÖØ-öø-ÿ0-9.]+\\s?)+$".toRegex())) {
+                throw InvalidError()
             }
-        }
+
+            title
+        } ?: ""
     }
 
-    @JvmInline
-    value class Content(val value: String) {
-        class BlankException : IllegalArgumentException()
-        class LengthException : IllegalArgumentException()
+    class Content(content: String? = null) {
+        class BlankError : Error()
+        class LengthError : Error()
 
-        init {
-            if (value.isBlank()) {
-                throw BlankException()
+        val value = content?.let {
+            if (content.isBlank()) {
+                throw BlankError()
             }
 
-            if (value.length > 64000) {
-                throw LengthException()
+            if (content.length > 64000) {
+                throw LengthError()
             }
-        }
+
+            content
+        } ?: ""
     }
 
     var path = ""
-    var title = ""
-    var content = ""
+    var title = Title()
+    var content = Content()
     var url = ""
     var isRanking = false
     var image: ByteArray? = null

@@ -6,6 +6,6 @@ import io.github.oxiadenine.rpgcbot.Game
 
 object GameInlineKeyboardMarkup {
     fun create(games: List<Game>) = InlineKeyboardMarkup.create(games.map { game ->
-        listOf(InlineKeyboardButton.CallbackData(text = game.name, callbackData = game.code))
+        listOf(InlineKeyboardButton.CallbackData(text = game.name, callbackData = game.key))
     })
 }

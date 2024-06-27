@@ -140,7 +140,23 @@ fun main() {
                                 replyMarkup = ReplyKeyboardRemove()
                             )
                         }
-                        else -> return@message
+                        else -> {
+                            if (currentCommandMap[userId] != null) return@message
+
+                            if (commandName.length < 3) return@message
+
+                            characterPageRepository.read().filter { characterPageEntity ->
+                                characterPageEntity.title
+                                    .normalize()
+                                    .replace("[^a-zA-Z0-9]".toRegex(), "")
+                                    .contains(commandName, ignoreCase = true)
+                            }.map { characterPageEntity ->
+                                bot.sendMessage(
+                                    chatId = ChatId.fromId(userId),
+                                    text = characterPageEntity.url
+                                )
+                            }
+                        }
                     }
                 }.onFailure { error ->
                     when (error) {

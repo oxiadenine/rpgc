@@ -6,14 +6,19 @@ import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
+import io.ktor.server.config.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonArray
 
-class TelegraphApi(private val httpClient: HttpClient) {
+class TelegraphApi(
+    private val config: ApplicationConfig,
+    private val httpClient: HttpClient
+) {
     companion object {
         const val API_URL = "https://api.telegra.ph/"
         const val UPLOAD_URL = "https://telegra.ph/upload"
+        const val DOWNLOAD_URL = "https://telegra.ph/"
     }
 
     @Serializable
@@ -54,15 +59,15 @@ class TelegraphApi(private val httpClient: HttpClient) {
 
     @Serializable
     data class GetAccountInfo(
-        @SerialName("access_token") val accessToken: String,
+        @SerialName("access_token") var accessToken: String = "",
         val fields: List<String>
     )
 
     @Serializable
     data class CreatePage(
-        @SerialName("access_token") val accessToken: String,
+        @SerialName("access_token") var accessToken: String = "",
         val title: String,
-        @SerialName("author_name") val authorName: String? = null,
+        @SerialName("author_name") var authorName: String? = null,
         @SerialName("author_url") val authorUrl: String? = null,
         val content: String,
         @SerialName("return_content") val returnContent: Boolean = false
@@ -70,10 +75,10 @@ class TelegraphApi(private val httpClient: HttpClient) {
 
     @Serializable
     data class EditPage(
-        @SerialName("access_token") val accessToken: String,
+        @SerialName("access_token") var accessToken: String = "",
         val title: String,
         val content: String,
-        @SerialName("author_name") val authorName: String? = null,
+        @SerialName("author_name") var authorName: String? = null,
         @SerialName("author_url") val authorUrl: String? = null,
         @SerialName("return_content") val returnContent: Boolean = false
     )
@@ -83,7 +88,7 @@ class TelegraphApi(private val httpClient: HttpClient) {
 
     @Serializable
     data class GetPageList(
-        @SerialName("access_token") val accessToken: String,
+        @SerialName("access_token") var accessToken: String = "",
         val offset: Int = 0,
         val limit: Int = 50
     )
@@ -101,14 +106,22 @@ class TelegraphApi(private val httpClient: HttpClient) {
     data class UploadImageResponse(val src: String)
 
     suspend fun getAccountInfo(getAccountInfo: GetAccountInfo) = runCatching {
+        getAccountInfo.accessToken = config.property("accessToken").getString()
+
         handleAccountResponse(httpClient.post("$API_URL/getAccountInfo") { setBody(getAccountInfo) })
     }
 
     suspend fun createPage(createPage: CreatePage) = runCatching {
+        createPage.accessToken = config.property("accessToken").getString()
+        createPage.authorName = config.property("username").getString()
+
         handlePageResponse(httpClient.post("$API_URL/createPage") { setBody(createPage) })
     }
 
     suspend fun editPage(path: String, editPage: EditPage) = runCatching {
+        editPage.accessToken = config.property("accessToken").getString()
+        editPage.authorName = config.property("username").getString()
+
         handlePageResponse(httpClient.post("$API_URL/editPage/$path") { setBody(editPage) })
     }
 
@@ -117,6 +130,8 @@ class TelegraphApi(private val httpClient: HttpClient) {
     }
 
     suspend fun getPageList(getPageList: GetPageList) = runCatching {
+        getPageList.accessToken = config.property("accessToken").getString()
+
         handlePageListResponse(httpClient.post("$API_URL/getPageList") { setBody(getPageList) })
     }
 
@@ -129,6 +144,8 @@ class TelegraphApi(private val httpClient: HttpClient) {
             })
         }
     ).body<List<UploadImageResponse>>()[0].src
+
+    suspend fun downloadImage(imageSrc: String) = httpClient.get("$DOWNLOAD_URL/$imageSrc").readBytes()
 
     private suspend fun handleAccountResponse(httpResponse: HttpResponse): Account {
         val accountResponse = httpResponse.body<AccountResponse>()

@@ -1,8 +1,8 @@
 package io.github.oxiadenine.rpgcbot
 
-import com.typesafe.config.Config
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
+import io.ktor.server.config.*
 import kotlinx.coroutines.Dispatchers
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
@@ -25,12 +25,12 @@ object CharacterPageTable : Table("character_page") {
 
 class Database private constructor(private val connection: Database) {
     companion object {
-        fun create(config: Config): io.github.oxiadenine.rpgcbot.Database {
+        fun create(config: ApplicationConfig): io.github.oxiadenine.rpgcbot.Database {
             val hikariConfig = HikariConfig().apply {
-                jdbcUrl = config.getString("url")
-                driverClassName = config.getString("driver")
-                username = config.getString("username")
-                password = config.getString("password")
+                jdbcUrl = config.property("url").getString()
+                driverClassName = config.property("driver").getString()
+                username = config.property("username").getString()
+                password = config.property("password").getString()
                 isAutoCommit = true
                 transactionIsolation = Connection.TRANSACTION_REPEATABLE_READ.toString()
 

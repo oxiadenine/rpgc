@@ -12,6 +12,13 @@ import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransacti
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.sql.Connection
 
+object UserTable : Table("user") {
+    val id = long("id").uniqueIndex()
+    val name = varchar("name", 128).index()
+
+    override val primaryKey = PrimaryKey(id)
+}
+
 object GameTable : Table("game") {
     val key = varchar("key", 16).uniqueIndex()
     val name = varchar("name", 64).index()
@@ -53,7 +60,7 @@ class Database private constructor(private val connection: Database) {
 
     init {
         transaction(connection) {
-            SchemaUtils.create(GameTable, CharacterPageTable)
+            SchemaUtils.create(UserTable, GameTable, CharacterPageTable)
         }
     }
 

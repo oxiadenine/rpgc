@@ -12,10 +12,7 @@ import com.github.kotlintelegrambot.entities.inlinequeryresults.InputMessageCont
 import com.github.kotlintelegrambot.extensions.filters.Filter
 import com.typesafe.config.ConfigFactory
 import io.github.oxiadenine.rpgcbot.network.TelegraphApi
-import io.github.oxiadenine.rpgcbot.repository.CharacterPage
-import io.github.oxiadenine.rpgcbot.repository.CharacterPageRepository
-import io.github.oxiadenine.rpgcbot.repository.Game
-import io.github.oxiadenine.rpgcbot.repository.GameRepository
+import io.github.oxiadenine.rpgcbot.repository.*
 import io.github.oxiadenine.rpgcbot.view.CharacterPageKeyboardReplyMarkup
 import io.github.oxiadenine.rpgcbot.view.GameInlineKeyboardMarkup
 import io.ktor.client.*
@@ -53,14 +50,11 @@ fun String.normalize() = Normalizer.normalize(
 
 fun Application.bot(
     telegraphApi: TelegraphApi,
+    userRepository: UserRepository,
     gameRepository: GameRepository,
     characterPageRepository: CharacterPageRepository
 ) {
     val config =  environment.config.config("bot")
-
-    val userIds = config.property("userWhitelist").getString()
-        .split(",")
-        .map { userId -> userId.toLong() }
 
     val bot = bot {
         token = config.property("token").getString()
@@ -87,7 +81,9 @@ fun Application.bot(
                         Command.EDITCHARPAGE.name,
                         Command.NEWCHARRANKPAGE.name,
                         Command.EDITCHARRANKPAGE.name -> {
-                            if (!userIds.contains(userId)) {
+                            val users = userRepository.read()
+
+                            if (users.isEmpty() || !users.any { user -> user.id == userId }) {
                                 throw UnauthorizedError()
                             }
 
@@ -630,6 +626,7 @@ fun Application.bot(
 
 fun Application.api(
     telegraphApi: TelegraphApi,
+    userRepository: UserRepository,
     gameRepository: GameRepository,
     characterPageRepository: CharacterPageRepository
 ) {
@@ -637,6 +634,32 @@ fun Application.api(
         json()
     }
     install(Routing) {
+        post("/users") {
+            val body = call.receive<JsonObject>()
+
+            val users = body["users"]!!.jsonArray.map { jsonElement ->
+                val userId = jsonElement.jsonObject["id"]!!.jsonPrimitive.content.toLong()
+                val userName = jsonElement.jsonObject["name"]!!.jsonPrimitive.content
+
+                User(userId, userName)
+            }
+
+            users.forEach { user -> userRepository.create(user) }
+
+            val response = buildJsonObject {
+                put("ok", true)
+                put("result", buildJsonArray {
+                    users.map { user ->
+                        add(buildJsonObject {
+                            put("id", user.id)
+                            put("name", user.name)
+                        })
+                    }
+                })
+            }
+
+            call.respond(response)
+        }
         post("/games") {
             val body = call.receive<JsonObject>()
 
@@ -748,6 +771,7 @@ fun main() {
 
     val telegraphApi = TelegraphApi(appConfig.config("telegraph"), httpClient)
 
+    val userRepository = UserRepository(database)
     val gameRepository = GameRepository(database)
     val characterPageRepository = CharacterPageRepository(database)
 
@@ -755,8 +779,8 @@ fun main() {
         config = appConfig
 
         module {
-            bot(telegraphApi, gameRepository, characterPageRepository)
-            api(telegraphApi, gameRepository, characterPageRepository)
+            bot(telegraphApi, userRepository, gameRepository, characterPageRepository)
+            api(telegraphApi, userRepository, gameRepository, characterPageRepository)
         }
 
         connector {

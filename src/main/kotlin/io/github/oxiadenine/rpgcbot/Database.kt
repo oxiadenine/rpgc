@@ -12,6 +12,13 @@ import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransacti
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.sql.Connection
 
+object GameTable : Table("game") {
+    val key = varchar("key", 16).uniqueIndex()
+    val name = varchar("name", 64).index()
+
+    override val primaryKey = PrimaryKey(key)
+}
+
 object CharacterPageTable : Table("character_page") {
     val path = varchar("path", 128).uniqueIndex()
     val title = varchar("title", 64).index()
@@ -19,6 +26,7 @@ object CharacterPageTable : Table("character_page") {
     val url = varchar("url", 128)
     val isRanking = bool("is_ranking")
     val image = blob("image").nullable()
+    val gameKey = varchar("game_key", 64) references GameTable.key
 
     override val primaryKey = PrimaryKey(path)
 }
@@ -45,7 +53,7 @@ class Database private constructor(private val connection: Database) {
 
     init {
         transaction(connection) {
-            SchemaUtils.create(CharacterPageTable)
+            SchemaUtils.create(GameTable, CharacterPageTable)
         }
     }
 

@@ -56,6 +56,7 @@ class CharacterPage {
     var url = ""
     var isRanking = false
     var image: ByteArray? = null
+    var gameKey: String = ""
 }
 
 class CharacterPageRepository(private val database: Database) {
@@ -69,6 +70,7 @@ class CharacterPageRepository(private val database: Database) {
             if (characterPage.image != null) {
                 statement[image] = ExposedBlob(characterPage.image!!)
             }
+            statement[gameKey] = characterPage.gameKey
         }
 
         Unit
@@ -82,8 +84,24 @@ class CharacterPageRepository(private val database: Database) {
                 content = CharacterPage.Content(record[CharacterPageTable.content])
                 url = record[CharacterPageTable.url]
                 isRanking = record[CharacterPageTable.isRanking]
+                gameKey = record[CharacterPageTable.gameKey]
             }
         }
+    }
+
+    suspend fun read(gameKey: String) = database.transaction {
+        CharacterPageTable.selectAll()
+            .where { CharacterPageTable.gameKey eq gameKey }
+            .map { record ->
+                CharacterPage().apply {
+                    path = record[CharacterPageTable.path]
+                    title = CharacterPage.Title(record[CharacterPageTable.title])
+                    content = CharacterPage.Content(record[CharacterPageTable.content])
+                    url = record[CharacterPageTable.url]
+                    isRanking = record[CharacterPageTable.isRanking]
+                    this.gameKey = record[CharacterPageTable.gameKey]
+                }
+            }
     }
 
     suspend fun update(characterPage: CharacterPage) = database.transaction {

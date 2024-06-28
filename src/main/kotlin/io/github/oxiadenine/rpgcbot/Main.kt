@@ -14,6 +14,8 @@ import com.typesafe.config.ConfigFactory
 import io.github.oxiadenine.rpgcbot.network.TelegraphApi
 import io.github.oxiadenine.rpgcbot.repository.CharacterPage
 import io.github.oxiadenine.rpgcbot.repository.CharacterPageRepository
+import io.github.oxiadenine.rpgcbot.repository.Game
+import io.github.oxiadenine.rpgcbot.repository.GameRepository
 import io.github.oxiadenine.rpgcbot.view.CharacterPageKeyboardReplyMarkup
 import io.github.oxiadenine.rpgcbot.view.GameInlineKeyboardMarkup
 import io.ktor.client.*
@@ -24,6 +26,7 @@ import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.config.*
 import io.ktor.server.engine.*
+import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.encodeToString
@@ -41,8 +44,6 @@ enum class Command {
     CANCEL
 }
 
-data class Game(val key: String, val name: String)
-
 class UnauthorizedError : Error()
 
 fun String.normalize() = Normalizer.normalize(
@@ -52,6 +53,7 @@ fun String.normalize() = Normalizer.normalize(
 
 fun Application.bot(
     telegraphApi: TelegraphApi,
+    gameRepository: GameRepository,
     characterPageRepository: CharacterPageRepository
 ) {
     val config =  environment.config.config("bot")
@@ -59,13 +61,6 @@ fun Application.bot(
     val userIds = config.property("userWhitelist").getString()
         .split(",")
         .map { userId -> userId.toLong() }
-
-    val games = config.property("gameList").getString()
-        .split(",")
-        .map { gameName -> Game(
-            key = gameName.lowercase().split(" ").joinToString("") { "${it[0]}" },
-            name = gameName
-        )}
 
     val bot = bot {
         token = config.property("token").getString()
@@ -113,13 +108,22 @@ fun Application.bot(
                                 }
                             }
 
-                            currentCommandMap[userId] = Command.valueOf(commandName.uppercase())
+                            val games = gameRepository.read()
 
-                            bot.sendMessage(
-                                chatId = ChatId.fromId(userId),
-                                text = intl.translate(id = "command.game.list.message"),
-                                replyMarkup = GameInlineKeyboardMarkup.create(games)
-                            )
+                            if (games.isEmpty()) {
+                                bot.sendMessage(
+                                    chatId = ChatId.fromId(userId),
+                                    text = intl.translate(id = "command.game.list.empty.message")
+                                )
+                            } else {
+                                currentCommandMap[userId] = Command.valueOf(commandName.uppercase())
+
+                                bot.sendMessage(
+                                    chatId = ChatId.fromId(userId),
+                                    text = intl.translate(id = "command.game.list.message"),
+                                    replyMarkup = GameInlineKeyboardMarkup.create(games)
+                                )
+                            }
                         }
                         Command.CANCEL.name -> {
                             val currentCommand = currentCommandMap[userId] ?: return@message
@@ -185,21 +189,17 @@ fun Application.bot(
                     if (currentCharacterPage.title.value.isEmpty()) {
                         val characterPageTitle = CharacterPage.Title(message.text!!)
 
-                        val characterPages = characterPageRepository.read()
-
                         when (currentCommand) {
                             Command.NEWCHARPAGE, Command.NEWCHARRANKPAGE -> {
                                 val characterPageIsRanking = currentCommand.name == Command.NEWCHARRANKPAGE.name
 
                                 val characterPageExists = if (characterPageIsRanking) {
-                                    characterPages.filter { characterPage ->
-                                        characterPage.path.contains(currentGame.key) &&
-                                                characterPage.isRanking
+                                    currentGame.characterPages.filter { characterPage ->
+                                        characterPage.isRanking
                                     }
                                 } else {
-                                    characterPages.filter { characterPage ->
-                                        characterPage.path.contains(currentGame.key) &&
-                                                !characterPage.isRanking
+                                    currentGame.characterPages.filter { characterPage ->
+                                        !characterPage.isRanking
                                     }
                                 }.any { characterPage ->
                                     characterPage.title.value.normalize().equals(
@@ -225,14 +225,12 @@ fun Application.bot(
                             }
                             Command.EDITCHARPAGE, Command.EDITCHARRANKPAGE -> {
                                 val characterPage = if (currentCommand.name == Command.EDITCHARRANKPAGE.name) {
-                                    characterPages.filter { characterPage ->
-                                        characterPage.path.contains(currentGame.key) &&
-                                                characterPage.isRanking
+                                    currentGame.characterPages.filter { characterPage ->
+                                        characterPage.isRanking
                                     }
                                 } else {
-                                    characterPages.filter { characterPage ->
-                                        characterPage.path.contains(currentGame.key) &&
-                                                !characterPage.isRanking
+                                    currentGame.characterPages.filter { characterPage ->
+                                        !characterPage.isRanking
                                     }
                                 }.firstOrNull { characterPage ->
                                     characterPage.title.value.normalize().equals(
@@ -336,6 +334,7 @@ fun Application.bot(
 
                                 currentCharacterPage.path = page.path
                                 currentCharacterPage.url = page.url
+                                currentCharacterPage.gameKey = currentGame.key
 
                                 telegraphApi.editPage(currentCharacterPage.path, TelegraphApi.EditPage(
                                     title = currentCharacterPage.title.value,
@@ -485,6 +484,7 @@ fun Application.bot(
 
                             currentCharacterPage.path = page.path
                             currentCharacterPage.url = page.url
+                            currentCharacterPage.gameKey = currentGame.key
 
                             telegraphApi.editPage(currentCharacterPage.path, TelegraphApi.EditPage(
                                 title = currentCharacterPage.title.value,
@@ -544,13 +544,14 @@ fun Application.bot(
                 val currentCommand = currentCommandMap[userId] ?: return@callbackQuery
 
                 runCatching {
-                    val game = games.first { game -> game.key == callbackQuery.data }
-
-                    currentCharacterPageMap[userId] = CharacterPage()
+                    val game = gameRepository.read(callbackQuery.data).apply {
+                        characterPages = characterPageRepository.read(key)
+                    }
 
                     when (currentCommand) {
                         Command.NEWCHARPAGE, Command.NEWCHARRANKPAGE -> {
                             currentGameMap[userId] = game
+                            currentCharacterPageMap[userId] = CharacterPage()
 
                             bot.sendMessage(
                                 chatId = ChatId.fromId(userId),
@@ -559,24 +560,23 @@ fun Application.bot(
                         }
                         Command.EDITCHARPAGE, Command.EDITCHARRANKPAGE -> {
                             val characterPages = if (currentCommand.name == Command.EDITCHARRANKPAGE.name) {
-                                characterPageRepository.read().filter { characterPage ->
-                                    characterPage.path.contains(game.key) &&
-                                            characterPage.isRanking
+                                game.characterPages.filter { characterPage ->
+                                    characterPage.isRanking
                                 }
                             } else {
-                                characterPageRepository.read().filter { characterPage ->
-                                    characterPage.path.contains(game.key) &&
-                                            !characterPage.isRanking
+                                game.characterPages.filter { characterPage ->
+                                    !characterPage.isRanking
                                 }
                             }
 
                             if (characterPages.isEmpty()) {
                                 bot.sendMessage(
                                     chatId = ChatId.fromId(userId),
-                                    text = intl.translate(id = "command.game.list.empty.message")
+                                    text = intl.translate(id = "command.game.list.character.page.list.empty.message")
                                 )
                             } else {
                                 currentGameMap[userId] = game
+                                currentCharacterPageMap[userId] = CharacterPage()
 
                                 bot.sendMessage(
                                     chatId = ChatId.fromId(userId),
@@ -616,9 +616,7 @@ fun Application.bot(
                             id = characterPage.path,
                             title = characterPage.title.value,
                             inputMessageContent = InputMessageContent.Text(characterPage.url),
-                            description = games.first { game ->
-                                game.key == characterPage.path.substringBefore("-")
-                            }.name
+                            description = gameRepository.read(characterPage.gameKey).name
                         )
                     }
 
@@ -632,12 +630,40 @@ fun Application.bot(
 
 fun Application.api(
     telegraphApi: TelegraphApi,
+    gameRepository: GameRepository,
     characterPageRepository: CharacterPageRepository
 ) {
     install(io.ktor.server.plugins.contentnegotiation.ContentNegotiation) {
         json()
     }
     install(Routing) {
+        post("/games") {
+            val body = call.receive<JsonObject>()
+
+            val games = body["games"]!!.jsonArray.map { jsonElement ->
+                val gameName = jsonElement.jsonPrimitive.content
+                val gameKey = gameName.lowercase().split(" ")
+                    .joinToString("") { part -> "${part[0]}" }
+
+                Game(gameKey, gameName)
+            }
+
+            games.forEach { game -> gameRepository.create(game) }
+
+            val response = buildJsonObject {
+                put("ok", true)
+                put("result", buildJsonArray {
+                    games.map { game ->
+                        add(buildJsonObject {
+                            put("key", game.key)
+                            put("name", game.name)
+                        })
+                    }
+                })
+            }
+
+            call.respond(response)
+        }
         post("/characterPages") {
             val pageCount = telegraphApi.getAccountInfo(TelegraphApi.GetAccountInfo(
                 fields = listOf("page_count")
@@ -676,6 +702,7 @@ fun Application.api(
                     url = page.url
                     isRanking = page.path.contains(CharacterPage.Paths.RANKING.name, true)
                     image = characterPageImage
+                    gameKey = page.path.substringBefore("-")
                 }
 
                 characterPageRepository.create(characterPage)
@@ -720,14 +747,16 @@ fun main() {
     val database = Database.create(appConfig.config("database"))
 
     val telegraphApi = TelegraphApi(appConfig.config("telegraph"), httpClient)
+
+    val gameRepository = GameRepository(database)
     val characterPageRepository = CharacterPageRepository(database)
 
     val appEngineEnv = applicationEngineEnvironment {
         config = appConfig
 
         module {
-            bot(telegraphApi, characterPageRepository)
-            api(telegraphApi, characterPageRepository)
+            bot(telegraphApi, gameRepository, characterPageRepository)
+            api(telegraphApi, gameRepository, characterPageRepository)
         }
 
         connector {

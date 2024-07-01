@@ -540,8 +540,10 @@ fun Application.bot(
                 val currentCommand = currentCommandMap[userId] ?: return@callbackQuery
 
                 runCatching {
-                    val game = gameRepository.read(callbackQuery.data).apply {
-                        characterPages = characterPageRepository.read(key)
+                    val game = gameRepository.read(callbackQuery.data)!!.let { game ->
+                        game.characterPages = characterPageRepository.read(game)
+
+                        game
                     }
 
                     when (currentCommand) {
@@ -612,7 +614,7 @@ fun Application.bot(
                             id = characterPage.path,
                             title = characterPage.title.value,
                             inputMessageContent = InputMessageContent.Text(characterPage.url),
-                            description = gameRepository.read(characterPage.gameKey).name
+                            description = gameRepository.read(characterPage.gameKey)!!.name
                         )
                     }
 
@@ -641,10 +643,14 @@ fun Application.api(
                 val userId = jsonElement.jsonObject["id"]!!.jsonPrimitive.content.toLong()
                 val userName = jsonElement.jsonObject["name"]!!.jsonPrimitive.content
 
-                User(userId, userName)
-            }
+                val user = User(userId, userName)
 
-            users.forEach { user -> userRepository.create(user) }
+                if (userRepository.read(user.id) == null) {
+                    userRepository.create(user)
+                } else userRepository.update(user)
+
+                user
+            }
 
             val response = buildJsonObject {
                 put("ok", true)
@@ -668,10 +674,14 @@ fun Application.api(
                 val gameKey = gameName.lowercase().split(" ")
                     .joinToString("") { part -> "${part[0]}" }
 
-                Game(gameKey, gameName)
-            }
+                val game = Game(gameKey, gameName)
 
-            games.forEach { game -> gameRepository.create(game) }
+                if (gameRepository.read(game.key) == null) {
+                    gameRepository.create(game)
+                } else gameRepository.update(game)
+
+                game
+            }
 
             val response = buildJsonObject {
                 put("ok", true)
@@ -711,12 +721,13 @@ fun Application.api(
             val characterPages = pages.map { partialPage ->
                 val page = telegraphApi.getPage(partialPage.path, TelegraphApi.GetPage()).getOrThrow()
 
-                val characterPageImage = if (page.content!!.last().jsonObject["tag"]!!.jsonPrimitive.content == "figure") {
-                    val imageSrc = page.content.last().jsonObject["children"]!!.jsonArray
-                        .last().jsonObject["attrs"]!!.jsonObject["src"]!!.jsonPrimitive.content
+                val characterPageImage =
+                    if (page.content!!.last().jsonObject["tag"]!!.jsonPrimitive.content == "figure") {
+                        val imageSrc = page.content.last().jsonObject["children"]!!.jsonArray
+                            .last().jsonObject["attrs"]!!.jsonObject["src"]!!.jsonPrimitive.content
 
-                    telegraphApi.downloadImage(imageSrc)
-                } else null
+                        telegraphApi.downloadImage(imageSrc)
+                    } else null
 
                 val characterPage = CharacterPage().apply {
                     path = page.path
@@ -728,7 +739,9 @@ fun Application.api(
                     gameKey = page.path.substringBefore("-")
                 }
 
-                characterPageRepository.create(characterPage)
+                if (characterPageRepository.read(characterPage.path) == null) {
+                    characterPageRepository.create(characterPage)
+                } else characterPageRepository.update(characterPage)
 
                 characterPage
             }

@@ -4,6 +4,7 @@ import io.github.oxiadenine.rpgcbot.Database
 import io.github.oxiadenine.rpgcbot.GameTable
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
+import org.jetbrains.exposed.sql.update
 
 data class Game(
     val key: String,
@@ -28,8 +29,16 @@ class GameRepository(private val database: Database) {
     }
 
     suspend fun read(key: String) = database.transaction {
-        GameTable.selectAll().where { GameTable.key eq key }.first().let { record ->
+        GameTable.selectAll().where { GameTable.key eq key }.firstOrNull()?.let { record ->
             Game(record[GameTable.key], record[GameTable.name])
         }
+    }
+
+    suspend fun update(game: Game) = database.transaction {
+        GameTable.update({ GameTable.key eq game.key }) { statement ->
+            statement[name] = game.name
+        }
+
+        Unit
     }
 }

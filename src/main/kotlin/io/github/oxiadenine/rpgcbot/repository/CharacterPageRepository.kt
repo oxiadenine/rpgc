@@ -89,12 +89,26 @@ class CharacterPageRepository(private val database: Database) {
         }
     }
 
-    suspend fun read(gameKey: String) = database.transaction {
+    suspend fun read(game: Game) = database.transaction {
         CharacterPageTable.selectAll()
-            .where { CharacterPageTable.gameKey eq gameKey }
+            .where { CharacterPageTable.gameKey eq game.key }
             .map { record ->
                 CharacterPage().apply {
                     path = record[CharacterPageTable.path]
+                    title = CharacterPage.Title(record[CharacterPageTable.title])
+                    content = CharacterPage.Content(record[CharacterPageTable.content])
+                    url = record[CharacterPageTable.url]
+                    isRanking = record[CharacterPageTable.isRanking]
+                    gameKey = record[CharacterPageTable.gameKey]
+                }
+            }
+    }
+
+    suspend fun read(path: String) = database.transaction {
+        CharacterPageTable.selectAll().where { CharacterPageTable.path eq path }
+            .firstOrNull()?.let { record ->
+                CharacterPage().apply {
+                    this.path = record[CharacterPageTable.path]
                     title = CharacterPage.Title(record[CharacterPageTable.title])
                     content = CharacterPage.Content(record[CharacterPageTable.content])
                     url = record[CharacterPageTable.url]

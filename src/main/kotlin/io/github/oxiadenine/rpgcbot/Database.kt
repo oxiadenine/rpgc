@@ -4,6 +4,7 @@ import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
 import io.ktor.server.config.*
 import kotlinx.coroutines.Dispatchers
+import org.jetbrains.exposed.dao.id.IntIdTable
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.Table
@@ -24,6 +25,11 @@ object GameTable : Table("game") {
     val name = varchar("name", 64).index()
 
     override val primaryKey = PrimaryKey(key)
+}
+
+object UserGameSubscriptionTable : IntIdTable("user_game_subscription") {
+    val userId = long("user_id") references UserTable.id
+    val gameKey = varchar("game_key", 64) references GameTable.key
 }
 
 object CharacterPageTable : Table("character_page") {
@@ -60,7 +66,12 @@ class Database private constructor(private val connection: Database) {
 
     init {
         transaction(connection) {
-            SchemaUtils.create(UserTable, GameTable, CharacterPageTable)
+            SchemaUtils.create(
+                UserTable,
+                GameTable,
+                UserGameSubscriptionTable,
+                CharacterPageTable
+            )
         }
     }
 

@@ -34,6 +34,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 enum class Command {
     START,
+    SETGAMESUB,
     NEWCHARPAGE,
     EDITCHARPAGE,
     NEWCHARRANKPAGE,
@@ -52,6 +53,7 @@ fun Application.bot(
     telegraphApi: TelegraphApi,
     userRepository: UserRepository,
     gameRepository: GameRepository,
+    userGameSubscriptionRepository: UserGameSubscriptionRepository,
     characterPageRepository: CharacterPageRepository
 ) {
     val config =  environment.config.config("bot")
@@ -77,6 +79,7 @@ fun Application.bot(
                             chatId = ChatId.fromId(userId),
                             text = intl.translate(id = "command.start.message")
                         )
+                        Command.SETGAMESUB.name,
                         Command.NEWCHARPAGE.name,
                         Command.EDITCHARPAGE.name,
                         Command.NEWCHARRANKPAGE.name,
@@ -104,7 +107,13 @@ fun Application.bot(
                                 }
                             }
 
-                            val games = gameRepository.read()
+                            val games = if (commandName == Command.SETGAMESUB.name) {
+                                gameRepository.read().map { game ->
+                                    userGameSubscriptionRepository.read(userId, game.key)?.let {
+                                        Game(game.key, "\u2705 ${game.name}")
+                                    } ?: game
+                                }
+                            } else gameRepository.read()
 
                             if (games.isEmpty()) {
                                 bot.sendMessage(
@@ -347,6 +356,27 @@ fun Application.bot(
                                     )
                                 )
 
+                                userGameSubscriptionRepository.read()
+                                    .filter { userGameSubscription ->
+                                        userGameSubscription.userId != userId
+                                    }
+                                    .map { userGameSubscription ->
+                                        val userIntl = bot.getChatMember(
+                                            ChatId.fromId(userGameSubscription.userId),
+                                            userGameSubscription.userId
+                                        ).getOrNull()?.user?.languageCode?.let { locale ->
+                                            Intl(locale)
+                                        } ?: Intl()
+
+                                        bot.sendMessage(
+                                            chatId = ChatId.fromId(userGameSubscription.userId),
+                                            text = userIntl.translate(
+                                                id = "command.set.game.subscription.new.character.page.success.message",
+                                                value = "title" to currentCharacterPage.title.value
+                                            )
+                                        )
+                                    }
+
                                 currentCharacterPageMap.remove(userId)
                                 currentGameMap.remove(userId)
                                 currentCommandMap.remove(userId)
@@ -370,6 +400,27 @@ fun Application.bot(
                                         value = "title" to currentCharacterPage.title.value
                                     )
                                 )
+
+                                userGameSubscriptionRepository.read()
+                                    .filter { userGameSubscription ->
+                                        userGameSubscription.userId != userId
+                                    }
+                                    .map { userGameSubscription ->
+                                        val userIntl = bot.getChatMember(
+                                            ChatId.fromId(userGameSubscription.userId),
+                                            userGameSubscription.userId
+                                        ).getOrNull()?.user?.languageCode?.let { locale ->
+                                            Intl(locale)
+                                        } ?: Intl()
+
+                                        bot.sendMessage(
+                                            chatId = ChatId.fromId(userGameSubscription.userId),
+                                            text = userIntl.translate(
+                                                id = "command.set.game.subscription.edit.character.page.success.message",
+                                                value = "title" to currentCharacterPage.title.value
+                                            )
+                                        )
+                                    }
 
                                 currentCharacterPageMap.remove(userId)
                                 currentGameMap.remove(userId)
@@ -496,6 +547,27 @@ fun Application.bot(
                                     value = "title" to currentCharacterPage.title.value
                                 )
                             )
+
+                            userGameSubscriptionRepository.read()
+                                .filter { userGameSubscription ->
+                                    userGameSubscription.userId != userId
+                                }
+                                .map { userGameSubscription ->
+                                    val userIntl = bot.getChatMember(
+                                        ChatId.fromId(userGameSubscription.userId),
+                                        userGameSubscription.userId
+                                    ).getOrNull()?.user?.languageCode?.let { locale ->
+                                        Intl(locale)
+                                    } ?: Intl()
+
+                                    bot.sendMessage(
+                                        chatId = ChatId.fromId(userGameSubscription.userId),
+                                        text = userIntl.translate(
+                                            id = "command.set.game.subscription.new.character.page.success.message",
+                                            value = "title" to currentCharacterPage.title.value
+                                        )
+                                    )
+                                }
                         }
                         Command.EDITCHARRANKPAGE -> {
                             telegraphApi.editPage(currentCharacterPage.path, TelegraphApi.EditPage(
@@ -512,6 +584,27 @@ fun Application.bot(
                                     value = "title" to currentCharacterPage.title.value
                                 )
                             )
+
+                            userGameSubscriptionRepository.read()
+                                .filter { userGameSubscription ->
+                                    userGameSubscription.userId != userId
+                                }
+                                .map { userGameSubscription ->
+                                    val userIntl = bot.getChatMember(
+                                        ChatId.fromId(userGameSubscription.userId),
+                                        userGameSubscription.userId
+                                    ).getOrNull()?.user?.languageCode?.let { locale ->
+                                        Intl(locale)
+                                    } ?: Intl()
+
+                                    bot.sendMessage(
+                                        chatId = ChatId.fromId(userGameSubscription.userId),
+                                        text = userIntl.translate(
+                                            id = "command.set.game.subscription.edit.character.page.success.message",
+                                            value = "title" to currentCharacterPage.title.value
+                                        )
+                                    )
+                                }
                         }
                         else -> return@message
                     }
@@ -547,6 +640,36 @@ fun Application.bot(
                     }
 
                     when (currentCommand) {
+                        Command.SETGAMESUB -> {
+                            currentGameMap[userId] = game
+
+                            userGameSubscriptionRepository.read(userId, game.key)?.run {
+                                userGameSubscriptionRepository.delete(userId, game.key)
+
+                                bot.sendMessage(
+                                    chatId = ChatId.fromId(userId),
+                                    text = intl.translate(
+                                        id = "command.set.game.subscription.unsubscribe.success.message",
+                                        value = "name" to game.name
+                                    )
+                                )
+                            } ?: run {
+                                val userGameSubscription = UserGameSubscription(userId, game.key)
+
+                                userGameSubscriptionRepository.create(userGameSubscription)
+
+                                bot.sendMessage(
+                                    chatId = ChatId.fromId(userId),
+                                    text = intl.translate(
+                                        id = "command.set.game.subscription.subscribe.success.message",
+                                        value = "name" to game.name
+                                    )
+                                )
+                            }
+
+                            currentGameMap.remove(userId)
+                            currentCommandMap.remove(userId)
+                        }
                         Command.NEWCHARPAGE, Command.NEWCHARRANKPAGE -> {
                             currentGameMap[userId] = game
                             currentCharacterPageMap[userId] = CharacterPage()
@@ -786,13 +909,14 @@ fun main() {
 
     val userRepository = UserRepository(database)
     val gameRepository = GameRepository(database)
+    val userGameSubscriptionRepository = UserGameSubscriptionRepository(database)
     val characterPageRepository = CharacterPageRepository(database)
 
     val appEngineEnv = applicationEngineEnvironment {
         config = appConfig
 
         module {
-            bot(telegraphApi, userRepository, gameRepository, characterPageRepository)
+            bot(telegraphApi, userRepository, gameRepository, userGameSubscriptionRepository, characterPageRepository)
             api(telegraphApi, userRepository, gameRepository, characterPageRepository)
         }
 

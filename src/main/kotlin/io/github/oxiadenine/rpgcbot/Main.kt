@@ -75,10 +75,12 @@ fun Application.bot(
 
                 runCatching {
                     when (commandName) {
-                        Command.START.name -> bot.sendMessage(
-                            chatId = ChatId.fromId(userId),
-                            text = intl.translate(id = "command.start.message")
-                        )
+                        Command.START.name -> {
+                            bot.sendMessage(
+                                chatId = ChatId.fromId(userId),
+                                text = intl.translate(id = "command.start.message")
+                            )
+                        }
                         Command.SETGAMESUB.name,
                         Command.NEWCHARPAGE.name,
                         Command.EDITCHARPAGE.name,
@@ -91,29 +93,34 @@ fun Application.bot(
                             }
 
                             if (currentCommandMap[userId] != null) {
-                                currentCharacterPageMap.remove(userId)
-                                currentGameMap.remove(userId)
-                                currentCommandMap.remove(userId)
-
                                 bot.sendMessage(
                                     chatId = ChatId.fromId(userId),
                                     text = "\u2062",
                                     replyMarkup = ReplyKeyboardRemove()
                                 ).getOrNull()?.let { message ->
-                                    bot.deleteMessage(
-                                        chatId = ChatId.fromId(userId),
-                                        messageId = message.messageId
-                                    )
+                                    bot.deleteMessage(chatId = ChatId.fromId(userId), messageId = message.messageId)
                                 }
+
+                                currentCharacterPageMap.remove(userId)
+                                currentGameMap.remove(userId)
+                                currentCommandMap.remove(userId)
                             }
 
-                            val games = if (commandName == Command.SETGAMESUB.name) {
-                                gameRepository.read().map { game ->
-                                    userGameSubscriptionRepository.read(userId, game.key)?.let {
-                                        Game(game.key, "\u2705 ${game.name}")
-                                    } ?: game
+                            val games = when (commandName) {
+                                Command.SETGAMESUB.name -> {
+                                    gameRepository.read().map { game ->
+                                        userGameSubscriptionRepository.read(userId, game.key)?.let {
+                                            Game(game.key, "\uD83D\uDD14 ${game.name}")
+                                        } ?: game
+                                    }
                                 }
-                            } else gameRepository.read()
+                                Command.EDITCHARPAGE.name, Command.EDITCHARRANKPAGE.name -> {
+                                    gameRepository.read().filter { game ->
+                                        characterPageRepository.read(game).isNotEmpty()
+                                    }
+                                }
+                                else -> gameRepository.read()
+                            }
 
                             if (games.isEmpty()) {
                                 bot.sendMessage(
@@ -121,7 +128,7 @@ fun Application.bot(
                                     text = intl.translate(id = "command.game.list.empty.message")
                                 )
                             } else {
-                                currentCommandMap[userId] = Command.valueOf(commandName.uppercase())
+                                currentCommandMap[userId] = Command.valueOf(commandName)
 
                                 bot.sendMessage(
                                     chatId = ChatId.fromId(userId),
@@ -149,7 +156,7 @@ fun Application.bot(
                         else -> {
                             if (currentCommandMap[userId] != null) return@message
 
-                            if (commandName.length < 3) return@message
+                            if (commandName.length < 4) return@message
 
                             characterPageRepository.read().filter { characterPage ->
                                 characterPage.title.value
@@ -157,10 +164,7 @@ fun Application.bot(
                                     .replace("[^a-zA-Z0-9]".toRegex(), "")
                                     .contains(commandName, true)
                             }.map { characterPage ->
-                                bot.sendMessage(
-                                    chatId = ChatId.fromId(userId),
-                                    text = characterPage.url
-                                )
+                                bot.sendMessage(chatId = ChatId.fromId(userId), text = characterPage.url)
                             }
                         }
                     }
@@ -186,7 +190,7 @@ fun Application.bot(
                 val currentCommand = currentCommandMap[userId] ?: return@message
                 val currentGame = currentGameMap[userId] ?: return@message
 
-                val currentCharacterPage = currentCharacterPageMap[userId] ?: return@message
+                var currentCharacterPage = currentCharacterPageMap[userId] ?: return@message
 
                 if (currentCharacterPage.content.value.isNotEmpty()) return@message
 
@@ -196,65 +200,53 @@ fun Application.bot(
 
                         when (currentCommand) {
                             Command.NEWCHARPAGE, Command.NEWCHARRANKPAGE -> {
-                                val characterPageIsRanking = currentCommand.name == Command.NEWCHARRANKPAGE.name
-
-                                val characterPageExists = if (characterPageIsRanking) {
-                                    currentGame.characterPages.filter { characterPage ->
-                                        characterPage.isRanking
-                                    }
-                                } else {
-                                    currentGame.characterPages.filter { characterPage ->
-                                        !characterPage.isRanking
-                                    }
-                                }.any { characterPage ->
-                                    characterPage.title.value.normalize().equals(
-                                        characterPageTitle.value.normalize(),
-                                        true
-                                    )
+                                val characterPageExists = currentGame.characterPages.any { characterPage ->
+                                    characterPage.title.value
+                                        .normalize()
+                                        .equals(characterPageTitle.value.normalize(), true)
                                 }
 
                                 if (characterPageExists) {
                                     throw CharacterPage.Title.ExistsError()
                                 }
 
-                                currentCharacterPage.title = characterPageTitle
-                                currentCharacterPage.isRanking = characterPageIsRanking
+                                currentCharacterPage = CharacterPage(
+                                    title = characterPageTitle,
+                                    isRanking = currentCharacterPage.isRanking,
+                                    gameKey = currentCharacterPage.gameKey
+                                )
+
+                                currentCharacterPageMap[userId] = currentCharacterPage
 
                                 bot.sendMessage(
                                     chatId = ChatId.fromId(userId),
-                                    text = intl.translate(
-                                        id = "command.new.character.page.content.message",
-                                        value = "title" to currentCharacterPage.title.value
-                                    )
+                                    text = intl.translate(id = if (currentCharacterPage.isRanking) {
+                                        "command.newcharrankpage.content.message"
+                                    } else "command.newcharpage.content.message")
                                 )
                             }
                             Command.EDITCHARPAGE, Command.EDITCHARRANKPAGE -> {
-                                val characterPage = if (currentCommand.name == Command.EDITCHARRANKPAGE.name) {
-                                    currentGame.characterPages.filter { characterPage ->
-                                        characterPage.isRanking
-                                    }
-                                } else {
-                                    currentGame.characterPages.filter { characterPage ->
-                                        !characterPage.isRanking
-                                    }
-                                }.firstOrNull { characterPage ->
-                                    characterPage.title.value.normalize().equals(
-                                        characterPageTitle.value.normalize(),
-                                        true
-                                    )
+                                val characterPage = currentGame.characterPages.firstOrNull { characterPage ->
+                                    characterPage.title.value
+                                        .normalize()
+                                        .equals(characterPageTitle.value.normalize(), true)
                                 } ?: return@message
 
-                                currentCharacterPage.path = characterPage.path
-                                currentCharacterPage.title = characterPage.title
-                                currentCharacterPage.url = characterPage.url
-                                currentCharacterPage.isRanking = characterPage.isRanking
+                                currentCharacterPage = CharacterPage(
+                                    path = characterPage.path,
+                                    title = characterPage.title,
+                                    url = characterPage.url,
+                                    isRanking = characterPage.isRanking,
+                                    gameKey = characterPage.gameKey
+                                )
+
+                                currentCharacterPageMap[userId] = currentCharacterPage
 
                                 bot.sendMessage(
                                     chatId = ChatId.fromId(userId),
-                                    text = intl.translate(
-                                        id = "command.edit.character.page.content.message1",
-                                        value = "title" to currentCharacterPage.title.value
-                                    ),
+                                    text = intl.translate(id = if (currentCharacterPage.isRanking) {
+                                        "command.editcharrankpage.content.message1"
+                                    } else "command.editcharpage.content.message1"),
                                     replyMarkup = ReplyKeyboardRemove()
                                 )
 
@@ -291,7 +283,9 @@ fun Application.bot(
 
                                 bot.sendMessage(
                                     chatId = ChatId.fromId(userId),
-                                    text = intl.translate(id = "command.edit.character.page.content.message2")
+                                    text = intl.translate(id = if (currentCharacterPage.isRanking) {
+                                        "command.editcharrankpage.content.message2"
+                                    } else "command.editcharpage.content.message2")
                                 )
                             }
                             else -> return@message
@@ -321,7 +315,7 @@ fun Application.bot(
                             append("]")
                         }
 
-                        currentCharacterPage.content = CharacterPage.Content(characterPageContentJson)
+                        val characterPageContent = CharacterPage.Content(characterPageContentJson)
 
                         when (currentCommand) {
                             Command.NEWCHARPAGE -> {
@@ -334,45 +328,51 @@ fun Application.bot(
                                             .replace(" ", "-")
                                         )
                                     },
-                                    content = currentCharacterPage.content.value
+                                    content = characterPageContent.value
                                 )).getOrThrow()
 
-                                currentCharacterPage.path = page.path
-                                currentCharacterPage.url = page.url
-                                currentCharacterPage.gameKey = currentGame.key
-
-                                telegraphApi.editPage(currentCharacterPage.path, TelegraphApi.EditPage(
+                                telegraphApi.editPage(page.path, TelegraphApi.EditPage(
                                     title = currentCharacterPage.title.value,
-                                    content = currentCharacterPage.content.value
+                                    content = characterPageContent.value
                                 )).getOrThrow()
+
+                                currentCharacterPage = CharacterPage(
+                                    path = page.path,
+                                    title = currentCharacterPage.title,
+                                    content = characterPageContent,
+                                    url = page.url,
+                                    isRanking = currentCharacterPage.isRanking,
+                                    gameKey = currentCharacterPage.gameKey
+                                )
 
                                 characterPageRepository.create(currentCharacterPage)
 
                                 bot.sendMessage(
                                     chatId = ChatId.fromId(userId),
                                     text = intl.translate(
-                                        id = "command.new.character.page.success.message",
+                                        id = "command.newcharpage.success.message",
                                         value = "title" to currentCharacterPage.title.value
                                     )
                                 )
 
                                 userGameSubscriptionRepository.read()
-                                    .filter { userGameSubscription ->
-                                        userGameSubscription.userId != userId
-                                    }
-                                    .map { userGameSubscription ->
+                                    .filter { userGameSubscription -> userGameSubscription.userId != userId }
+                                    .forEach { userGameSubscription ->
                                         val userIntl = bot.getChatMember(
-                                            ChatId.fromId(userGameSubscription.userId),
-                                            userGameSubscription.userId
-                                        ).getOrNull()?.user?.languageCode?.let { locale ->
-                                            Intl(locale)
-                                        } ?: Intl()
+                                            chatId = ChatId.fromId(userGameSubscription.userId),
+                                            userId = userGameSubscription.userId
+                                        ).getOrNull()?.user?.languageCode?.let { locale -> Intl(locale) } ?: Intl()
+
+                                        val user = userRepository.read(userGameSubscription.userId)
 
                                         bot.sendMessage(
                                             chatId = ChatId.fromId(userGameSubscription.userId),
                                             text = userIntl.translate(
-                                                id = "command.set.game.subscription.new.character.page.success.message",
-                                                value = "title" to currentCharacterPage.title.value
+                                                id = "command.setgamesub.characterPage.created.message",
+                                                values = listOf(
+                                                    "name" to user!!.name,
+                                                    "title" to currentCharacterPage.title.value
+                                                )
                                             )
                                         )
                                     }
@@ -381,43 +381,62 @@ fun Application.bot(
                                 currentGameMap.remove(userId)
                                 currentCommandMap.remove(userId)
                             }
-                            Command.NEWCHARRANKPAGE -> bot.sendMessage(
-                                chatId = ChatId.fromId(userId),
-                                text = intl.translate(id = "command.new.character.page.content.image.message")
-                            )
+                            Command.NEWCHARRANKPAGE -> {
+                                currentCharacterPageMap[userId] = CharacterPage(
+                                    title = currentCharacterPage.title,
+                                    content = characterPageContent,
+                                    isRanking = currentCharacterPage.isRanking,
+                                    gameKey = currentCharacterPage.gameKey
+                                )
+
+                                bot.sendMessage(
+                                    chatId = ChatId.fromId(userId),
+                                    text = intl.translate(id = "command.newcharrankpage.content.image.message")
+                                )
+                            }
                             Command.EDITCHARPAGE -> {
                                 telegraphApi.editPage(currentCharacterPage.path, TelegraphApi.EditPage(
                                     title = currentCharacterPage.title.value,
-                                    content = currentCharacterPage.content.value
+                                    content = characterPageContent.value
                                 )).getOrThrow()
+
+                                currentCharacterPage = CharacterPage(
+                                    path = currentCharacterPage.path,
+                                    title = currentCharacterPage.title,
+                                    content = characterPageContent,
+                                    url = currentCharacterPage.url,
+                                    isRanking = currentCharacterPage.isRanking,
+                                    gameKey = currentCharacterPage.gameKey
+                                )
 
                                 characterPageRepository.update(currentCharacterPage)
 
                                 bot.sendMessage(
                                     chatId = ChatId.fromId(userId),
                                     text = intl.translate(
-                                        id = "command.edit.character.page.success.message",
+                                        id = "command.editcharpage.success.message",
                                         value = "title" to currentCharacterPage.title.value
                                     )
                                 )
 
                                 userGameSubscriptionRepository.read()
-                                    .filter { userGameSubscription ->
-                                        userGameSubscription.userId != userId
-                                    }
-                                    .map { userGameSubscription ->
+                                    .filter { userGameSubscription -> userGameSubscription.userId != userId }
+                                    .forEach { userGameSubscription ->
                                         val userIntl = bot.getChatMember(
-                                            ChatId.fromId(userGameSubscription.userId),
-                                            userGameSubscription.userId
-                                        ).getOrNull()?.user?.languageCode?.let { locale ->
-                                            Intl(locale)
-                                        } ?: Intl()
+                                            chatId = ChatId.fromId(userGameSubscription.userId),
+                                            userId = userGameSubscription.userId
+                                        ).getOrNull()?.user?.languageCode?.let { locale -> Intl(locale) } ?: Intl()
+
+                                        val user = userRepository.read(userGameSubscription.userId)
 
                                         bot.sendMessage(
                                             chatId = ChatId.fromId(userGameSubscription.userId),
                                             text = userIntl.translate(
-                                                id = "command.set.game.subscription.edit.character.page.success.message",
-                                                value = "title" to currentCharacterPage.title.value
+                                                id = "command.setgamesub.characterPage.edited.message",
+                                                values = listOf(
+                                                    "name" to user!!.name,
+                                                    "title" to currentCharacterPage.title.value
+                                                )
                                             )
                                         )
                                     }
@@ -426,10 +445,21 @@ fun Application.bot(
                                 currentGameMap.remove(userId)
                                 currentCommandMap.remove(userId)
                             }
-                            Command.EDITCHARRANKPAGE -> bot.sendMessage(
-                                chatId = ChatId.fromId(userId),
-                                text = intl.translate(id = "command.edit.character.page.content.image.message")
-                            )
+                            Command.EDITCHARRANKPAGE -> {
+                                currentCharacterPageMap[userId] = CharacterPage(
+                                    path = currentCharacterPage.path,
+                                    title = currentCharacterPage.title,
+                                    content = characterPageContent,
+                                    url = currentCharacterPage.url,
+                                    isRanking = currentCharacterPage.isRanking,
+                                    gameKey = currentCharacterPage.gameKey
+                                )
+
+                                bot.sendMessage(
+                                    chatId = ChatId.fromId(userId),
+                                    text = intl.translate(id = "command.editcharrankpage.content.image.message")
+                                )
+                            }
                             else -> return@message
                         }
                     }
@@ -437,27 +467,39 @@ fun Application.bot(
                     when (error) {
                         is CharacterPage.Title.BlankError -> bot.sendMessage(
                             chatId = ChatId.fromId(userId),
-                            text = intl.translate("command.new.character.page.title.blank.message")
+                            text = intl.translate(id = if (currentCharacterPage.isRanking) {
+                                "command.newcharrankpage.title.blank.message"
+                            } else "command.newcharpage.title.blank.message")
                         )
                         is CharacterPage.Title.LengthError -> bot.sendMessage(
                             chatId = ChatId.fromId(userId),
-                            text = intl.translate("command.new.character.page.title.length.message")
+                            text = intl.translate(id = if (currentCharacterPage.isRanking) {
+                                "command.newcharrankpage.title.length.message"
+                            } else "command.newcharpage.title.length.message")
                         )
                         is CharacterPage.Title.InvalidError -> bot.sendMessage(
                             chatId = ChatId.fromId(userId),
-                            text = intl.translate("command.new.character.page.title.invalid.message")
+                            text = intl.translate(id = if (currentCharacterPage.isRanking) {
+                                "command.newcharrankpage.title.invalid.message"
+                            } else "command.newcharpage.title.invalid.message")
                         )
                         is CharacterPage.Title.ExistsError -> bot.sendMessage(
                             chatId = ChatId.fromId(userId),
-                            text = intl.translate("command.new.character.page.title.exists.message")
+                            text = intl.translate(id = if (currentCharacterPage.isRanking) {
+                                "command.newcharrankpage.title.exists.message"
+                            } else "command.newcharpage.title.exists.message")
                         )
                         is CharacterPage.Content.BlankError -> bot.sendMessage(
                             chatId = ChatId.fromId(userId),
-                            text = intl.translate("command.new.character.page.content.blank.message")
+                            text = intl.translate(id = if (currentCharacterPage.isRanking) {
+                                "command.newcharrankpage.content.blank.message"
+                            } else "command.newcharpage.content.blank.message")
                         )
                         is CharacterPage.Content.LengthError -> bot.sendMessage(
                             chatId = ChatId.fromId(userId),
-                            text = intl.translate("command.new.character.page.content.length.message")
+                            text = intl.translate(id = if (currentCharacterPage.isRanking) {
+                                "command.newcharrankpage.content.length.message"
+                            } else "command.newcharpage.content.length.message")
                         )
                         else -> {
                             bot.sendMessage(
@@ -482,37 +524,37 @@ fun Application.bot(
                 val currentCommand = currentCommandMap[userId] ?: return@message
                 val currentGame = currentGameMap[userId] ?: return@message
 
-                val currentCharacterPage = currentCharacterPageMap[userId] ?: return@message
+                var currentCharacterPage = currentCharacterPageMap[userId] ?: return@message
 
                 if (currentCharacterPage.content.value.isEmpty()) return@message
 
                 runCatching {
-                    val imageUrl = bot.getFile(message.photo!!.last().fileId).first?.let { response ->
+                    val characterPageImage = bot.getFile(message.photo!!.last().fileId).first?.let { response ->
                         if (response.isSuccessful) {
                             bot.downloadFile(response.body()?.result!!.filePath!!)
                         } else error(response.message())
                     }?.first?.let { response ->
                         if (response.isSuccessful) {
-                            currentCharacterPage.image = response.body()!!.bytes()
+                            val imageBytes = response.body()!!.bytes()
+                            val imageSrc = telegraphApi.uploadImage(imageBytes)
 
-                            telegraphApi.uploadImage(currentCharacterPage.image!!)
+                            CharacterPage.Image(imageSrc, imageBytes)
                         } else error(response.message())
                     } ?: return@message
 
                     val characterPageContentImageJson = Json.encodeToString(buildJsonArray {
-                        addAll(Json.decodeFromString<JsonArray>(currentCharacterPage.content.value))
+                        Json.decodeFromString<JsonArray>(currentCharacterPage.content.value)
+                            .map { jsonElement -> add(jsonElement) }
                         add(Json.encodeToJsonElement(TelegraphApi.Node(
                             tag = "figure",
                             children = listOf(TelegraphApi.NodeElement(
                                 tag = "img",
-                                attrs = TelegraphApi.Attributes(
-                                    src = "https://telegra.ph$imageUrl"
-                                )
+                                attrs = TelegraphApi.Attributes(src = characterPageImage.src)
                             ))
                         )))
                     })
 
-                    currentCharacterPage.content = CharacterPage.Content(characterPageContentImageJson)
+                    val characterPageContent = CharacterPage.Content(characterPageContentImageJson)
 
                     when (currentCommand) {
                         Command.NEWCHARRANKPAGE -> {
@@ -526,45 +568,52 @@ fun Application.bot(
                                     )
                                     append("=${CharacterPage.Paths.RANKING.name.lowercase()}")
                                 },
-                                content = currentCharacterPage.content.value
+                                content = characterPageContent.value
                             )).getOrThrow()
-
-                            currentCharacterPage.path = page.path
-                            currentCharacterPage.url = page.url
-                            currentCharacterPage.gameKey = currentGame.key
 
                             telegraphApi.editPage(currentCharacterPage.path, TelegraphApi.EditPage(
                                 title = currentCharacterPage.title.value,
-                                content = currentCharacterPage.content.value
+                                content = characterPageContent.value
                             )).getOrThrow()
+
+                            currentCharacterPage = CharacterPage(
+                                path = page.path,
+                                title = currentCharacterPage.title,
+                                content = characterPageContent,
+                                url = page.url,
+                                isRanking = currentCharacterPage.isRanking,
+                                image = characterPageImage.bytes,
+                                gameKey = currentGame.key
+                            )
 
                             characterPageRepository.create(currentCharacterPage)
 
                             bot.sendMessage(
                                 chatId = ChatId.fromId(userId),
                                 text = intl.translate(
-                                    id = "command.new.character.page.success.message",
+                                    id = "command.newcharrankpage.success.message",
                                     value = "title" to currentCharacterPage.title.value
                                 )
                             )
 
                             userGameSubscriptionRepository.read()
-                                .filter { userGameSubscription ->
-                                    userGameSubscription.userId != userId
-                                }
-                                .map { userGameSubscription ->
+                                .filter { userGameSubscription -> userGameSubscription.userId != userId }
+                                .forEach { userGameSubscription ->
                                     val userIntl = bot.getChatMember(
-                                        ChatId.fromId(userGameSubscription.userId),
-                                        userGameSubscription.userId
-                                    ).getOrNull()?.user?.languageCode?.let { locale ->
-                                        Intl(locale)
-                                    } ?: Intl()
+                                        chatId = ChatId.fromId(userGameSubscription.userId),
+                                        userId = userGameSubscription.userId
+                                    ).getOrNull()?.user?.languageCode?.let { locale -> Intl(locale) } ?: Intl()
+
+                                    val user = userRepository.read(userGameSubscription.userId)
 
                                     bot.sendMessage(
                                         chatId = ChatId.fromId(userGameSubscription.userId),
                                         text = userIntl.translate(
-                                            id = "command.set.game.subscription.new.character.page.success.message",
-                                            value = "title" to currentCharacterPage.title.value
+                                            id = "command.setgamesub.characterPage.ranking.created.message",
+                                            values = listOf(
+                                                "name" to user!!.name,
+                                                "title" to currentCharacterPage.title.value
+                                            )
                                         )
                                     )
                                 }
@@ -572,36 +621,47 @@ fun Application.bot(
                         Command.EDITCHARRANKPAGE -> {
                             telegraphApi.editPage(currentCharacterPage.path, TelegraphApi.EditPage(
                                 title = currentCharacterPage.title.value,
-                                content = currentCharacterPage.content.value
+                                content = characterPageContent.value
                             )).getOrThrow()
+
+                            currentCharacterPage = CharacterPage(
+                                path = currentCharacterPage.path,
+                                title = currentCharacterPage.title,
+                                content = characterPageContent,
+                                url = currentCharacterPage.url,
+                                isRanking = currentCharacterPage.isRanking,
+                                image = characterPageImage.bytes,
+                                gameKey = currentCharacterPage.gameKey
+                            )
 
                             characterPageRepository.update(currentCharacterPage)
 
                             bot.sendMessage(
                                 chatId = ChatId.fromId(userId),
                                 text = intl.translate(
-                                    id = "command.edit.character.page.success.message",
+                                    id = "command.editcharrankpage.success.message",
                                     value = "title" to currentCharacterPage.title.value
                                 )
                             )
 
                             userGameSubscriptionRepository.read()
-                                .filter { userGameSubscription ->
-                                    userGameSubscription.userId != userId
-                                }
-                                .map { userGameSubscription ->
+                                .filter { userGameSubscription -> userGameSubscription.userId != userId }
+                                .forEach { userGameSubscription ->
                                     val userIntl = bot.getChatMember(
-                                        ChatId.fromId(userGameSubscription.userId),
-                                        userGameSubscription.userId
-                                    ).getOrNull()?.user?.languageCode?.let { locale ->
-                                        Intl(locale)
-                                    } ?: Intl()
+                                        chatId = ChatId.fromId(userGameSubscription.userId),
+                                        userId = userGameSubscription.userId
+                                    ).getOrNull()?.user?.languageCode?.let { locale -> Intl(locale) } ?: Intl()
+
+                                    val user = userRepository.read(userGameSubscription.userId)
 
                                     bot.sendMessage(
                                         chatId = ChatId.fromId(userGameSubscription.userId),
                                         text = userIntl.translate(
-                                            id = "command.set.game.subscription.edit.character.page.success.message",
-                                            value = "title" to currentCharacterPage.title.value
+                                            id = "command.setgamesub.characterPage.ranking.edited.message",
+                                            values = listOf(
+                                                "name" to user!!.name,
+                                                "title" to currentCharacterPage.title.value
+                                            )
                                         )
                                     )
                                 }
@@ -615,7 +675,7 @@ fun Application.bot(
                 }.onFailure {
                     bot.sendMessage(
                         chatId = ChatId.fromId(userId),
-                        text = intl.translate("command.error.message"),
+                        text = intl.translate(id = "command.error.message"),
                         replyMarkup = ReplyKeyboardRemove()
                     )
 
@@ -649,7 +709,7 @@ fun Application.bot(
                                 bot.sendMessage(
                                     chatId = ChatId.fromId(userId),
                                     text = intl.translate(
-                                        id = "command.set.game.subscription.unsubscribe.success.message",
+                                        id = "command.setgamesub.unsubscribe.success.message",
                                         value = "name" to game.name
                                     )
                                 )
@@ -661,7 +721,7 @@ fun Application.bot(
                                 bot.sendMessage(
                                     chatId = ChatId.fromId(userId),
                                     text = intl.translate(
-                                        id = "command.set.game.subscription.subscribe.success.message",
+                                        id = "command.setgamesub.subscribe.success.message",
                                         value = "name" to game.name
                                     )
                                 )
@@ -671,40 +731,49 @@ fun Application.bot(
                             currentCommandMap.remove(userId)
                         }
                         Command.NEWCHARPAGE, Command.NEWCHARRANKPAGE -> {
+                            val characterPageIsRanking = currentCommand == Command.NEWCHARRANKPAGE
+
+                            game.characterPages = if (characterPageIsRanking) {
+                                characterPageRepository.read(game).filter { characterPage -> characterPage.isRanking }
+                            } else {
+                                characterPageRepository.read(game).filter { characterPage -> !characterPage.isRanking }
+                            }
+
                             currentGameMap[userId] = game
-                            currentCharacterPageMap[userId] = CharacterPage()
+                            currentCharacterPageMap[userId] = CharacterPage(
+                                isRanking = characterPageIsRanking,
+                                gameKey = game.key
+                            )
 
                             bot.sendMessage(
                                 chatId = ChatId.fromId(userId),
-                                text = intl.translate(id = "command.new.character.page.title.message")
+                                text = intl.translate(id = if (characterPageIsRanking) {
+                                    "command.newcharrankpage.title.message"
+                                } else "command.newcharpage.title.message")
                             )
                         }
                         Command.EDITCHARPAGE, Command.EDITCHARRANKPAGE -> {
-                            val characterPages = if (currentCommand.name == Command.EDITCHARRANKPAGE.name) {
-                                game.characterPages.filter { characterPage ->
-                                    characterPage.isRanking
-                                }
+                            val characterPageIsRanking = currentCommand == Command.EDITCHARRANKPAGE
+
+                            game.characterPages = if (characterPageIsRanking) {
+                                characterPageRepository.read(game).filter { characterPage -> characterPage.isRanking }
                             } else {
-                                game.characterPages.filter { characterPage ->
-                                    !characterPage.isRanking
-                                }
+                                characterPageRepository.read(game).filter { characterPage -> !characterPage.isRanking }
                             }
 
-                            if (characterPages.isEmpty()) {
-                                bot.sendMessage(
-                                    chatId = ChatId.fromId(userId),
-                                    text = intl.translate(id = "command.game.list.character.page.list.empty.message")
-                                )
-                            } else {
-                                currentGameMap[userId] = game
-                                currentCharacterPageMap[userId] = CharacterPage()
+                            currentGameMap[userId] = game
+                            currentCharacterPageMap[userId] = CharacterPage(
+                                isRanking = characterPageIsRanking,
+                                gameKey = game.key
+                            )
 
-                                bot.sendMessage(
-                                    chatId = ChatId.fromId(userId),
-                                    text = intl.translate(id = "command.edit.character.page.list.message"),
-                                    replyMarkup = CharacterPageKeyboardReplyMarkup.create(characterPages)
-                                )
-                            }
+                            bot.sendMessage(
+                                chatId = ChatId.fromId(userId),
+                                text = intl.translate(id = if (characterPageIsRanking) {
+                                    "command.editcharrankpage.characterPage.list.message"
+                                } else "command.editcharpage.characterPage.list.message"),
+                                replyMarkup = CharacterPageKeyboardReplyMarkup.create(game.characterPages)
+                            )
                         }
                         else -> return@callbackQuery
                     }
@@ -727,10 +796,7 @@ fun Application.bot(
 
                 val pageInlineQueryResults = characterPageRepository.read()
                     .filter { characterPage ->
-                        characterPage.title.value.normalize().contains(
-                            pageTitleQuery.normalize(),
-                            true
-                        )
+                        characterPage.title.value.normalize().contains(pageTitleQuery.normalize(), true)
                     }
                     .map { characterPage ->
                         InlineQueryResult.Article(
@@ -852,15 +918,15 @@ fun Application.api(
                         telegraphApi.downloadImage(imageSrc)
                     } else null
 
-                val characterPage = CharacterPage().apply {
-                    path = page.path
-                    title = CharacterPage.Title(page.title)
-                    content = CharacterPage.Content(Json.encodeToString(page.content))
-                    url = page.url
-                    isRanking = page.path.contains(CharacterPage.Paths.RANKING.name, true)
-                    image = characterPageImage
-                    gameKey = page.path.substringBefore("-")
-                }
+                val characterPage = CharacterPage(
+                    page.path,
+                    CharacterPage.Title(page.title),
+                    CharacterPage.Content(Json.encodeToString(page.content)),
+                    page.url,
+                    page.path.contains(CharacterPage.Paths.RANKING.name, true),
+                    characterPageImage,
+                    page.path.substringBefore("-")
+                )
 
                 if (characterPageRepository.read(characterPage.path) == null) {
                     characterPageRepository.create(characterPage)

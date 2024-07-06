@@ -19,9 +19,7 @@ class UserRepository(private val database: Database) {
     }
 
     suspend fun read() = database.transaction {
-        UserTable.selectAll().map { record ->
-            User(record[UserTable.id], record[UserTable.name])
-        }
+        UserTable.selectAll().map { record -> User(record[UserTable.id], record[UserTable.name]) }
     }
 
     suspend fun read(id: Long) = database.transaction {
@@ -31,9 +29,7 @@ class UserRepository(private val database: Database) {
     }
 
     suspend fun update(user: User) = database.transaction {
-        UserTable.update({ UserTable.id eq user.id }) { statement ->
-            statement[name] = user.name
-        }
+        UserTable.update({ UserTable.id eq user.id }) { statement -> statement[name] = user.name }
 
         Unit
     }

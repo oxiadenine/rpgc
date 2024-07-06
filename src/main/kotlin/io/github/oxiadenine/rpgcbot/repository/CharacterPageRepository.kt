@@ -7,7 +7,15 @@ import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.statements.api.ExposedBlob
 import org.jetbrains.exposed.sql.update
 
-class CharacterPage {
+class CharacterPage(
+    val path: String = "",
+    val title: Title = Title(),
+    val content: Content = Content(),
+    val url: String = "",
+    val isRanking: Boolean = false,
+    val image: ByteArray? = null,
+    val gameKey: String = ""
+) {
     enum class Paths { RANKING }
 
     class Title(title: String? = null) {
@@ -50,13 +58,7 @@ class CharacterPage {
         } ?: ""
     }
 
-    var path = ""
-    var title = Title()
-    var content = Content()
-    var url = ""
-    var isRanking = false
-    var image: ByteArray? = null
-    var gameKey: String = ""
+    data class Image(val src: String, val bytes: ByteArray)
 }
 
 class CharacterPageRepository(private val database: Database) {
@@ -68,7 +70,7 @@ class CharacterPageRepository(private val database: Database) {
             statement[url] = characterPage.url
             statement[isRanking] = characterPage.isRanking
             if (characterPage.image != null) {
-                statement[image] = ExposedBlob(characterPage.image!!)
+                statement[image] = ExposedBlob(characterPage.image)
             }
             statement[gameKey] = characterPage.gameKey
         }
@@ -78,44 +80,44 @@ class CharacterPageRepository(private val database: Database) {
 
     suspend fun read() = database.transaction {
         CharacterPageTable.selectAll().map { record ->
-            CharacterPage().apply {
-                path = record[CharacterPageTable.path]
-                title = CharacterPage.Title(record[CharacterPageTable.title])
-                content = CharacterPage.Content(record[CharacterPageTable.content])
-                url = record[CharacterPageTable.url]
-                isRanking = record[CharacterPageTable.isRanking]
-                gameKey = record[CharacterPageTable.gameKey]
-            }
+            CharacterPage(
+                record[CharacterPageTable.path],
+                CharacterPage.Title(record[CharacterPageTable.title]),
+                CharacterPage.Content(record[CharacterPageTable.content]),
+                record[CharacterPageTable.url],
+                record[CharacterPageTable.isRanking],
+                record[CharacterPageTable.image]?.bytes,
+                record[CharacterPageTable.gameKey]
+            )
         }
     }
 
     suspend fun read(game: Game) = database.transaction {
-        CharacterPageTable.selectAll()
-            .where { CharacterPageTable.gameKey eq game.key }
-            .map { record ->
-                CharacterPage().apply {
-                    path = record[CharacterPageTable.path]
-                    title = CharacterPage.Title(record[CharacterPageTable.title])
-                    content = CharacterPage.Content(record[CharacterPageTable.content])
-                    url = record[CharacterPageTable.url]
-                    isRanking = record[CharacterPageTable.isRanking]
-                    gameKey = record[CharacterPageTable.gameKey]
-                }
-            }
+        CharacterPageTable.selectAll().where { CharacterPageTable.gameKey eq game.key }.map { record ->
+            CharacterPage(
+                record[CharacterPageTable.path],
+                CharacterPage.Title(record[CharacterPageTable.title]),
+                CharacterPage.Content(record[CharacterPageTable.content]),
+                record[CharacterPageTable.url],
+                record[CharacterPageTable.isRanking],
+                record[CharacterPageTable.image]?.bytes,
+                record[CharacterPageTable.gameKey]
+            )
+        }
     }
 
     suspend fun read(path: String) = database.transaction {
-        CharacterPageTable.selectAll().where { CharacterPageTable.path eq path }
-            .firstOrNull()?.let { record ->
-                CharacterPage().apply {
-                    this.path = record[CharacterPageTable.path]
-                    title = CharacterPage.Title(record[CharacterPageTable.title])
-                    content = CharacterPage.Content(record[CharacterPageTable.content])
-                    url = record[CharacterPageTable.url]
-                    isRanking = record[CharacterPageTable.isRanking]
-                    this.gameKey = record[CharacterPageTable.gameKey]
-                }
-            }
+        CharacterPageTable.selectAll().where { CharacterPageTable.path eq path }.firstOrNull()?.let { record ->
+            CharacterPage(
+                record[CharacterPageTable.path],
+                CharacterPage.Title(record[CharacterPageTable.title]),
+                CharacterPage.Content(record[CharacterPageTable.content]),
+                record[CharacterPageTable.url],
+                record[CharacterPageTable.isRanking],
+                record[CharacterPageTable.image]?.bytes,
+                record[CharacterPageTable.gameKey]
+            )
+        }
     }
 
     suspend fun update(characterPage: CharacterPage) = database.transaction {

@@ -15,7 +15,7 @@ import java.sql.Connection
 
 object UserTable : Table("user") {
     val id = long("id").uniqueIndex()
-    val name = varchar("name", 128).index()
+    val name = varchar("name", 64).index()
 
     override val primaryKey = PrimaryKey(id)
 }
@@ -28,8 +28,8 @@ object GameTable : Table("game") {
 }
 
 object UserGameSubscriptionTable : IntIdTable("user_game_subscription") {
-    val userId = long("user_id") references UserTable.id
-    val gameKey = varchar("game_key", 64) references GameTable.key
+    val userId = (long("user_id") references UserTable.id).index()
+    val gameKey = (varchar("game_key", 64) references GameTable.key).index()
 }
 
 object CharacterPageTable : Table("character_page") {
@@ -39,7 +39,7 @@ object CharacterPageTable : Table("character_page") {
     val url = varchar("url", 128)
     val isRanking = bool("is_ranking")
     val image = blob("image").nullable()
-    val gameKey = varchar("game_key", 64) references GameTable.key
+    val gameKey = (varchar("game_key", 64) references GameTable.key).index()
 
     override val primaryKey = PrimaryKey(path)
 }

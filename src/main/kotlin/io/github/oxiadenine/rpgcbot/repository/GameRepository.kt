@@ -23,9 +23,7 @@ class GameRepository(private val database: Database) {
     }
 
     suspend fun read() = database.transaction {
-        GameTable.selectAll().map { record ->
-            Game(record[GameTable.key], record[GameTable.name])
-        }
+        GameTable.selectAll().map { record -> Game(record[GameTable.key], record[GameTable.name]) }
     }
 
     suspend fun read(key: String) = database.transaction {
@@ -35,9 +33,7 @@ class GameRepository(private val database: Database) {
     }
 
     suspend fun update(game: Game) = database.transaction {
-        GameTable.update({ GameTable.key eq game.key }) { statement ->
-            statement[name] = game.name
-        }
+        GameTable.update({ GameTable.key eq game.key }) { statement -> statement[name] = game.name }
 
         Unit
     }

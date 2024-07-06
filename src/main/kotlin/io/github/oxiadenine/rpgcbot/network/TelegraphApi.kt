@@ -135,7 +135,7 @@ class TelegraphApi(
         handlePageListResponse(httpClient.post("$API_URL/getPageList") { setBody(getPageList) })
     }
 
-    suspend fun uploadImage(image: ByteArray): String = httpClient.submitFormWithBinaryData(
+    suspend fun uploadImage(image: ByteArray) = httpClient.submitFormWithBinaryData(
         url = UPLOAD_URL,
         formData = formData {
             append("file", image, Headers.build {

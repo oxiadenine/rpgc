@@ -35,4 +35,16 @@ class Intl(locale: String = DEFAULT_LOCALE) {
             message.replace("{${value.first}}", value.second)
         } else message
     } ?: ""
+
+    fun translate(id: String, values: List<Pair<String, String>>) = messages[id]?.let { message ->
+        var translatedMessage = message
+
+        values.forEach { value ->
+            translatedMessage = if (translatedMessage.contains(value.first)) {
+                translatedMessage.replace("{${value.first}}", value.second)
+            } else translatedMessage
+        }
+
+        translatedMessage
+    } ?: ""
 }

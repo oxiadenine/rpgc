@@ -15,6 +15,7 @@ import io.github.oxiadenine.rpgcbot.network.TelegraphApi
 import io.github.oxiadenine.rpgcbot.repository.*
 import io.github.oxiadenine.rpgcbot.view.CharacterPageKeyboardReplyMarkup
 import io.github.oxiadenine.rpgcbot.view.GameInlineKeyboardMarkup
+import io.github.oxiadenine.rpgcbot.view.UserGameSubscriptionInlineKeyboardMarkup
 import io.ktor.client.*
 import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
@@ -34,6 +35,8 @@ import java.util.concurrent.ConcurrentHashMap
 
 enum class Command {
     START,
+    NEWGAME,
+    DELETEGAME,
     SETGAMESUB,
     NEWCHARPAGE,
     EDITCHARPAGE,
@@ -81,6 +84,8 @@ fun Application.bot(
                                 text = intl.translate(id = "command.start.message")
                             )
                         }
+                        Command.NEWGAME.name,
+                        Command.DELETEGAME.name,
                         Command.SETGAMESUB.name,
                         Command.NEWCHARPAGE.name,
                         Command.EDITCHARPAGE.name,
@@ -106,12 +111,22 @@ fun Application.bot(
                                 currentCommandMap.remove(userId)
                             }
 
+                            if (commandName == Command.NEWGAME.name) {
+                                currentCommandMap[userId] = Command.valueOf(commandName)
+                                currentGameMap[userId] = Game()
+
+                                bot.sendMessage(
+                                    chatId = ChatId.fromId(userId),
+                                    text = intl.translate(id = "command.newgame.name.message")
+                                )
+
+                                return@message
+                            }
+
                             val games = when (commandName) {
-                                Command.SETGAMESUB.name -> {
-                                    gameRepository.read().map { game ->
-                                        userGameSubscriptionRepository.read(userId, game.key)?.let {
-                                            Game(game.key, "\uD83D\uDD14 ${game.name}")
-                                        } ?: game
+                                Command.DELETEGAME.name -> {
+                                    gameRepository.read().filter { game ->
+                                        characterPageRepository.read(game).isEmpty()
                                     }
                                 }
                                 Command.EDITCHARPAGE.name, Command.EDITCHARRANKPAGE.name -> {
@@ -133,7 +148,11 @@ fun Application.bot(
                                 bot.sendMessage(
                                     chatId = ChatId.fromId(userId),
                                     text = intl.translate(id = "command.game.list.message"),
-                                    replyMarkup = GameInlineKeyboardMarkup.create(games)
+                                    replyMarkup = if (commandName == Command.SETGAMESUB.name) {
+                                        val userGameSubscriptions = userGameSubscriptionRepository.read()
+
+                                        UserGameSubscriptionInlineKeyboardMarkup.create(games, userGameSubscriptions)
+                                    } else GameInlineKeyboardMarkup.create(games)
                                 )
                             }
                         }
@@ -188,7 +207,76 @@ fun Application.bot(
                 val userId = message.chat.id
 
                 val currentCommand = currentCommandMap[userId] ?: return@message
-                val currentGame = currentGameMap[userId] ?: return@message
+
+                var currentGame = currentGameMap[userId] ?: return@message
+
+                runCatching {
+                    if (currentGame.name.value.isEmpty() && currentCommand == Command.NEWGAME) {
+                        val gameName = Game.Name(message.text!!)
+
+                        val gameExists = gameRepository.read().any { game ->
+                            game.name.value.normalize().equals(gameName.value.normalize(), true)
+                        }
+
+                        if (gameExists) {
+                            throw Game.Name.ExistsError()
+                        }
+
+                        currentGame = Game(
+                            key = gameName.value
+                                .lowercase()
+                                .split(" ")
+                                .joinToString("") { part -> "${part[0]}" },
+                            name = gameName
+                        )
+
+                        gameRepository.create(currentGame)
+
+                        bot.sendMessage(
+                            chatId = ChatId.fromId(userId),
+                            text = intl.translate(
+                                id = "command.newgame.success.message",
+                                value = "name" to currentGame.name.value
+                            )
+                        )
+
+                        currentCharacterPageMap.remove(userId)
+                        currentGameMap.remove(userId)
+                        currentCommandMap.remove(userId)
+
+                        return@message
+                    }
+                }.onFailure { error ->
+                    when (error) {
+                        is Game.Name.BlankError -> bot.sendMessage(
+                            chatId = ChatId.fromId(userId),
+                            text = intl.translate(id = "command.newgame.name.blank.message")
+                        )
+                        is Game.Name.LengthError -> bot.sendMessage(
+                            chatId = ChatId.fromId(userId),
+                            text = intl.translate(id = "command.newgame.name.length.message")
+                        )
+                        is Game.Name.InvalidError -> bot.sendMessage(
+                            chatId = ChatId.fromId(userId),
+                            text = intl.translate(id = "command.newgame.name.invalid.message")
+                        )
+                        is Game.Name.ExistsError -> bot.sendMessage(
+                            chatId = ChatId.fromId(userId),
+                            text = intl.translate(id = "command.newgame.name.exists.message")
+                        )
+                        else -> {
+                            bot.sendMessage(
+                                chatId = ChatId.fromId(userId),
+                                text = intl.translate("command.error.message"),
+                                replyMarkup = ReplyKeyboardRemove()
+                            )
+
+                            currentCharacterPageMap.remove(userId)
+                            currentGameMap.remove(userId)
+                            currentCommandMap.remove(userId)
+                        }
+                    }
+                }
 
                 var currentCharacterPage = currentCharacterPageMap[userId] ?: return@message
 
@@ -200,7 +288,11 @@ fun Application.bot(
 
                         when (currentCommand) {
                             Command.NEWCHARPAGE, Command.NEWCHARRANKPAGE -> {
-                                val characterPageExists = currentGame.characterPages.any { characterPage ->
+                                val characterPageExists = if (currentCharacterPage.isRanking) {
+                                    currentGame.characterPages.filter { characterPage -> characterPage.isRanking }
+                                } else {
+                                    currentGame.characterPages.filter { characterPage -> !characterPage.isRanking }
+                                }.any { characterPage ->
                                     characterPage.title.value
                                         .normalize()
                                         .equals(characterPageTitle.value.normalize(), true)
@@ -226,7 +318,11 @@ fun Application.bot(
                                 )
                             }
                             Command.EDITCHARPAGE, Command.EDITCHARRANKPAGE -> {
-                                val characterPage = currentGame.characterPages.firstOrNull { characterPage ->
+                                val characterPage = if (currentCharacterPage.isRanking) {
+                                    currentGame.characterPages.filter { characterPage -> characterPage.isRanking }
+                                } else {
+                                    currentGame.characterPages.filter { characterPage -> !characterPage.isRanking }
+                                }.firstOrNull { characterPage ->
                                     characterPage.title.value
                                         .normalize()
                                         .equals(characterPageTitle.value.normalize(), true)
@@ -700,9 +796,20 @@ fun Application.bot(
                     }
 
                     when (currentCommand) {
-                        Command.SETGAMESUB -> {
-                            currentGameMap[userId] = game
+                        Command.DELETEGAME -> {
+                            gameRepository.delete(game.key)
 
+                            bot.sendMessage(
+                                chatId = ChatId.fromId(userId),
+                                text = intl.translate(
+                                    id = "command.deletegame.success.message",
+                                    value = "name" to game.name.value
+                                )
+                            )
+
+                            currentCommandMap.remove(userId)
+                        }
+                        Command.SETGAMESUB -> {
                             userGameSubscriptionRepository.read(userId, game.key)?.run {
                                 userGameSubscriptionRepository.delete(userId, game.key)
 
@@ -710,7 +817,7 @@ fun Application.bot(
                                     chatId = ChatId.fromId(userId),
                                     text = intl.translate(
                                         id = "command.setgamesub.unsubscribe.success.message",
-                                        value = "name" to game.name
+                                        value = "name" to game.name.value
                                     )
                                 )
                             } ?: run {
@@ -722,12 +829,11 @@ fun Application.bot(
                                     chatId = ChatId.fromId(userId),
                                     text = intl.translate(
                                         id = "command.setgamesub.subscribe.success.message",
-                                        value = "name" to game.name
+                                        value = "name" to game.name.value
                                     )
                                 )
                             }
 
-                            currentGameMap.remove(userId)
                             currentCommandMap.remove(userId)
                         }
                         Command.NEWCHARPAGE, Command.NEWCHARRANKPAGE -> {
@@ -803,7 +909,7 @@ fun Application.bot(
                             id = characterPage.path,
                             title = characterPage.title.value,
                             inputMessageContent = InputMessageContent.Text(characterPage.url),
-                            description = gameRepository.read(characterPage.gameKey)!!.name
+                            description = gameRepository.read(characterPage.gameKey)!!.name.value
                         )
                     }
 
@@ -859,8 +965,10 @@ fun Application.api(
             val body = call.receive<JsonObject>()
 
             val games = body["games"]!!.jsonArray.map { jsonElement ->
-                val gameName = jsonElement.jsonPrimitive.content
-                val gameKey = gameName.lowercase().split(" ")
+                val gameName = Game.Name(jsonElement.jsonPrimitive.content)
+                val gameKey = gameName.value
+                    .lowercase()
+                    .split(" ")
                     .joinToString("") { part -> "${part[0]}" }
 
                 val game = Game(gameKey, gameName)
@@ -878,7 +986,7 @@ fun Application.api(
                     games.map { game ->
                         add(buildJsonObject {
                             put("key", game.key)
-                            put("name", game.name)
+                            put("name", game.name.value)
                         })
                     }
                 })

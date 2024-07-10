@@ -41,4 +41,8 @@ class UserGameSubscriptionRepository(private val database: Database) {
 
         Unit
     }
+
+    suspend fun delete(gameKey: String) = database.transaction {
+        UserGameSubscriptionTable.deleteWhere { UserGameSubscriptionTable.gameKey eq gameKey }
+    }
 }

@@ -779,6 +779,7 @@ fun Application.bot(
 
                     when (currentCommand) {
                         Command.DELETEGAME -> {
+                            userGameSubscriptionRepository.delete(game.key)
                             gameRepository.delete(game.key)
 
                             bot.sendMessage(

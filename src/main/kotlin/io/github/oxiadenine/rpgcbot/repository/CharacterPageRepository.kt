@@ -6,6 +6,7 @@ import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.statements.api.ExposedBlob
 import org.jetbrains.exposed.sql.update
+import java.text.Normalizer
 
 class CharacterPage(
     val path: String = "",
@@ -18,11 +19,12 @@ class CharacterPage(
 ) {
     enum class Paths { RANKING }
 
+    class ExistsError : Error()
+
     class Title(title: String? = null) {
         class BlankError : Error()
         class LengthError : Error()
         class InvalidError : Error()
-        class ExistsError : Error()
 
         val value: String = title?.let {
             if (title.isBlank()) {
@@ -33,12 +35,16 @@ class CharacterPage(
                 throw LengthError()
             }
 
-            if (!title.matches("^([A-Za-zÀ-ÖØ-öø-ÿ0-9.]+\\s?)+$".toRegex())) {
+            if (!title.matches("^(.+ ?)+$".toRegex())) {
                 throw InvalidError()
             }
 
             title
         } ?: ""
+
+        fun normalize() = Normalizer.normalize(value, Normalizer.Form.NFKD)
+            .replace("\\p{M}".toRegex(), "")
+            .replace("[^a-zA-Z0-9 ]".toRegex(), "")
     }
 
     class Content(content: String? = null) {

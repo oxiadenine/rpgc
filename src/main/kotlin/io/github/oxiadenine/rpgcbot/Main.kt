@@ -30,7 +30,6 @@ import io.ktor.server.routing.*
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import org.jsoup.Jsoup
-import java.text.Normalizer
 import java.util.concurrent.ConcurrentHashMap
 
 enum class Command {
@@ -42,15 +41,10 @@ enum class Command {
     EDITCHARPAGE,
     NEWCHARRANKPAGE,
     EDITCHARRANKPAGE,
-    CANCEL
+    CANCEL;
+
+    class UnauthorizedError : Error()
 }
-
-class UnauthorizedError : Error()
-
-fun String.normalize() = Normalizer.normalize(
-    this,
-    Normalizer.Form.NFKD
-).replace("\\p{M}".toRegex(), "")
 
 fun Application.bot(
     telegraphApi: TelegraphApi,
@@ -94,7 +88,7 @@ fun Application.bot(
                             val users = userRepository.read()
 
                             if (users.isEmpty() || !users.any { user -> user.id == userId }) {
-                                throw UnauthorizedError()
+                                throw Command.UnauthorizedError()
                             }
 
                             if (currentCommandMap[userId] != null) {
@@ -178,9 +172,8 @@ fun Application.bot(
                             if (commandName.length < 4) return@message
 
                             characterPageRepository.read().filter { characterPage ->
-                                characterPage.title.value
-                                    .normalize()
-                                    .replace("[^a-zA-Z0-9]".toRegex(), "")
+                                characterPage.title.normalize()
+                                    .replace(" ", "")
                                     .contains(commandName, true)
                             }.map { characterPage ->
                                 bot.sendMessage(chatId = ChatId.fromId(userId), text = characterPage.url)
@@ -189,7 +182,7 @@ fun Application.bot(
                     }
                 }.onFailure { error ->
                     when (error) {
-                        is UnauthorizedError -> bot.sendMessage(
+                        is Command.UnauthorizedError -> bot.sendMessage(
                             chatId = ChatId.fromId(userId),
                             text = intl.translate(id = "command.unauthorized.message")
                         )
@@ -213,22 +206,21 @@ fun Application.bot(
                 runCatching {
                     if (currentGame.name.value.isEmpty() && currentCommand == Command.NEWGAME) {
                         val gameName = Game.Name(message.text!!)
+                        val gameKey = gameName.normalize()
+                            .lowercase()
+                            .split(" ")
+                            .joinToString("") { part -> "${part[0]}" }
 
                         val gameExists = gameRepository.read().any { game ->
-                            game.name.value.normalize().equals(gameName.value.normalize(), true)
+                            game.key.equals(gameKey, true) ||
+                                    game.name.value.equals(gameName.value, true)
                         }
 
                         if (gameExists) {
-                            throw Game.Name.ExistsError()
+                            throw Game.ExistsError()
                         }
 
-                        currentGame = Game(
-                            key = gameName.value
-                                .lowercase()
-                                .split(" ")
-                                .joinToString("") { part -> "${part[0]}" },
-                            name = gameName
-                        )
+                        currentGame = Game(key = gameKey, name = gameName)
 
                         gameRepository.create(currentGame)
 
@@ -240,7 +232,6 @@ fun Application.bot(
                             )
                         )
 
-                        currentCharacterPageMap.remove(userId)
                         currentGameMap.remove(userId)
                         currentCommandMap.remove(userId)
 
@@ -260,7 +251,7 @@ fun Application.bot(
                             chatId = ChatId.fromId(userId),
                             text = intl.translate(id = "command.newgame.name.invalid.message")
                         )
-                        is Game.Name.ExistsError -> bot.sendMessage(
+                        is Game.ExistsError -> bot.sendMessage(
                             chatId = ChatId.fromId(userId),
                             text = intl.translate(id = "command.newgame.name.exists.message")
                         )
@@ -288,21 +279,29 @@ fun Application.bot(
 
                         when (currentCommand) {
                             Command.NEWCHARPAGE, Command.NEWCHARRANKPAGE -> {
+                                val characterPagePath = buildString {
+                                    append("${currentGame.key}-")
+                                    append(characterPageTitle.normalize().lowercase().replace(" ", "-"))
+                                    if (currentCharacterPage.isRanking) {
+                                        append("-${CharacterPage.Paths.RANKING.name.lowercase()}")
+                                    }
+                                }
+
                                 val characterPageExists = if (currentCharacterPage.isRanking) {
                                     currentGame.characterPages.filter { characterPage -> characterPage.isRanking }
                                 } else {
                                     currentGame.characterPages.filter { characterPage -> !characterPage.isRanking }
                                 }.any { characterPage ->
-                                    characterPage.title.value
-                                        .normalize()
-                                        .equals(characterPageTitle.value.normalize(), true)
+                                    characterPage.path.contains(characterPagePath) ||
+                                            characterPage.title.value.equals(characterPageTitle.value, true)
                                 }
 
                                 if (characterPageExists) {
-                                    throw CharacterPage.Title.ExistsError()
+                                    throw CharacterPage.ExistsError()
                                 }
 
                                 currentCharacterPage = CharacterPage(
+                                    path = characterPagePath,
                                     title = characterPageTitle,
                                     isRanking = currentCharacterPage.isRanking,
                                     gameKey = currentCharacterPage.gameKey
@@ -323,9 +322,7 @@ fun Application.bot(
                                 } else {
                                     currentGame.characterPages.filter { characterPage -> !characterPage.isRanking }
                                 }.firstOrNull { characterPage ->
-                                    characterPage.title.value
-                                        .normalize()
-                                        .equals(characterPageTitle.value.normalize(), true)
+                                    characterPage.title.value.equals(characterPageTitle.value, true)
                                 } ?: return@message
 
                                 currentCharacterPage = CharacterPage(
@@ -416,14 +413,7 @@ fun Application.bot(
                         when (currentCommand) {
                             Command.NEWCHARPAGE -> {
                                 val page = telegraphApi.createPage(TelegraphApi.CreatePage(
-                                    title = buildString {
-                                        append("${currentGame.key}-")
-                                        append(currentCharacterPage.title.value
-                                            .normalize()
-                                            .lowercase()
-                                            .replace(" ", "-")
-                                        )
-                                    },
+                                    title = currentCharacterPage.path,
                                     content = characterPageContent.value
                                 )).getOrThrow()
 
@@ -579,12 +569,6 @@ fun Application.bot(
                                 "command.newcharrankpage.title.invalid.message"
                             } else "command.newcharpage.title.invalid.message")
                         )
-                        is CharacterPage.Title.ExistsError -> bot.sendMessage(
-                            chatId = ChatId.fromId(userId),
-                            text = intl.translate(id = if (currentCharacterPage.isRanking) {
-                                "command.newcharrankpage.title.exists.message"
-                            } else "command.newcharpage.title.exists.message")
-                        )
                         is CharacterPage.Content.BlankError -> bot.sendMessage(
                             chatId = ChatId.fromId(userId),
                             text = intl.translate(id = if (currentCharacterPage.isRanking) {
@@ -596,6 +580,12 @@ fun Application.bot(
                             text = intl.translate(id = if (currentCharacterPage.isRanking) {
                                 "command.newcharrankpage.content.length.message"
                             } else "command.newcharpage.content.length.message")
+                        )
+                        is CharacterPage.ExistsError -> bot.sendMessage(
+                            chatId = ChatId.fromId(userId),
+                            text = intl.translate(id = if (currentCharacterPage.isRanking) {
+                                "command.newcharrankpage.title.exists.message"
+                            } else "command.newcharpage.title.exists.message")
                         )
                         else -> {
                             bot.sendMessage(
@@ -655,15 +645,7 @@ fun Application.bot(
                     when (currentCommand) {
                         Command.NEWCHARRANKPAGE -> {
                             val page = telegraphApi.createPage(TelegraphApi.CreatePage(
-                                title = buildString {
-                                    append("${currentGame.key}-")
-                                    append(currentCharacterPage.title.value
-                                        .normalize()
-                                        .lowercase()
-                                        .replace(" ", "-")
-                                    )
-                                    append("=${CharacterPage.Paths.RANKING.name.lowercase()}")
-                                },
+                                title = currentCharacterPage.path,
                                 content = characterPageContent.value
                             )).getOrThrow()
 
@@ -900,9 +882,15 @@ fun Application.bot(
 
                 if (pageTitleQuery.isBlank() or pageTitleQuery.isEmpty()) return@inlineQuery
 
+                val characterPageTitle = try {
+                    CharacterPage.Title(pageTitleQuery)
+                } catch (_: Error) {
+                    return@inlineQuery
+                }
+
                 val pageInlineQueryResults = characterPageRepository.read()
                     .filter { characterPage ->
-                        characterPage.title.value.normalize().contains(pageTitleQuery.normalize(), true)
+                        characterPage.title.normalize().contains(characterPageTitle.normalize(), true)
                     }
                     .map { characterPage ->
                         InlineQueryResult.Article(

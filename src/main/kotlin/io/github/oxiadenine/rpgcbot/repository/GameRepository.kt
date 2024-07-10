@@ -7,13 +7,15 @@ import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.update
+import java.text.Normalizer
 
 class Game(val key: String = "", val name: Name = Name()) {
+    class ExistsError : Error()
+
     class Name(name: String? = null) {
         class BlankError : Error()
         class LengthError : Error()
         class InvalidError : Error()
-        class ExistsError : Error()
 
         val value: String = name?.let {
             if (name.isBlank()) {
@@ -24,12 +26,16 @@ class Game(val key: String = "", val name: Name = Name()) {
                 throw LengthError()
             }
 
-            if (!name.matches("^([A-Za-zÀ-ÖØ-öø-ÿ0-9.:]+\\s?)+$".toRegex())) {
+            if (!name.matches("^(.+ ?)+$".toRegex())) {
                 throw InvalidError()
             }
 
             name
         } ?: ""
+
+        fun normalize() = Normalizer.normalize(value, Normalizer.Form.NFKD)
+            .replace("\\p{M}".toRegex(), "")
+            .replace("[^a-zA-Z0-9 ]".toRegex(), "")
     }
 
     var characterPages: List<CharacterPage> = emptyList()

@@ -41,9 +41,7 @@ enum class Command {
     EDITCHARPAGE,
     NEWCHARRANKPAGE,
     EDITCHARRANKPAGE,
-    CANCEL;
-
-    class UnauthorizedError : Error()
+    CANCEL
 }
 
 fun Application.bot(
@@ -70,87 +68,41 @@ fun Application.bot(
 
                 val commandName = message.text!!.substringAfter("/").uppercase()
 
+                val user = userRepository.read(userId)
+
                 runCatching {
-                    when (commandName) {
-                        Command.START.name -> {
-                            bot.sendMessage(
-                                chatId = ChatId.fromId(userId),
-                                text = intl.translate(id = "command.start.message")
-                            )
+                    if (commandName == Command.START.name) {
+                        bot.sendMessage(
+                            chatId = ChatId.fromId(userId),
+                            text = intl.translate(id = "command.start.message")
+                        )
+
+                        return@message
+                    } else if (commandName != Command.NEWGAME.name &&
+                        commandName != Command.DELETEGAME.name &&
+                        commandName != Command.SETGAMESUB.name &&
+                        commandName != Command.NEWCHARPAGE.name &&
+                        commandName != Command.EDITCHARPAGE.name &&
+                        commandName != Command.NEWCHARRANKPAGE.name &&
+                        commandName != Command.EDITCHARRANKPAGE.name &&
+                        commandName != Command.CANCEL.name) {
+                        if (currentCommandMap[userId] != null) return@message
+
+                        if (commandName.length < 4) return@message
+
+                        characterPageRepository.read().filter { characterPage ->
+                            characterPage.title.normalize()
+                                .replace(" ", "")
+                                .contains(commandName, true)
+                        }.map { characterPage ->
+                            bot.sendMessage(chatId = ChatId.fromId(userId), text = characterPage.url)
                         }
-                        Command.NEWGAME.name,
-                        Command.DELETEGAME.name,
-                        Command.SETGAMESUB.name,
-                        Command.NEWCHARPAGE.name,
-                        Command.EDITCHARPAGE.name,
-                        Command.NEWCHARRANKPAGE.name,
-                        Command.EDITCHARRANKPAGE.name -> {
-                            val users = userRepository.read()
 
-                            if (users.isEmpty() || !users.any { user -> user.id == userId }) {
-                                throw Command.UnauthorizedError()
-                            }
+                        return@message
+                    }
 
-                            if (currentCommandMap[userId] != null) {
-                                bot.sendMessage(
-                                    chatId = ChatId.fromId(userId),
-                                    text = "\u2062",
-                                    replyMarkup = ReplyKeyboardRemove()
-                                ).getOrNull()?.let { message ->
-                                    bot.deleteMessage(chatId = ChatId.fromId(userId), messageId = message.messageId)
-                                }
-
-                                currentCharacterPageMap.remove(userId)
-                                currentGameMap.remove(userId)
-                                currentCommandMap.remove(userId)
-                            }
-
-                            if (commandName == Command.NEWGAME.name) {
-                                currentCommandMap[userId] = Command.valueOf(commandName)
-                                currentGameMap[userId] = Game()
-
-                                bot.sendMessage(
-                                    chatId = ChatId.fromId(userId),
-                                    text = intl.translate(id = "command.newgame.name.message")
-                                )
-
-                                return@message
-                            }
-
-                            val games = when (commandName) {
-                                Command.DELETEGAME.name -> {
-                                    gameRepository.read().filter { game ->
-                                        characterPageRepository.read(game).isEmpty()
-                                    }
-                                }
-                                Command.EDITCHARPAGE.name, Command.EDITCHARRANKPAGE.name -> {
-                                    gameRepository.read().filter { game ->
-                                        characterPageRepository.read(game).isNotEmpty()
-                                    }
-                                }
-                                else -> gameRepository.read()
-                            }
-
-                            if (games.isEmpty()) {
-                                bot.sendMessage(
-                                    chatId = ChatId.fromId(userId),
-                                    text = intl.translate(id = "command.game.list.empty.message")
-                                )
-                            } else {
-                                currentCommandMap[userId] = Command.valueOf(commandName)
-
-                                bot.sendMessage(
-                                    chatId = ChatId.fromId(userId),
-                                    text = intl.translate(id = "command.game.list.message"),
-                                    replyMarkup = if (commandName == Command.SETGAMESUB.name) {
-                                        val userGameSubscriptions = userGameSubscriptionRepository.read()
-
-                                        UserGameSubscriptionInlineKeyboardMarkup.create(games, userGameSubscriptions)
-                                    } else GameInlineKeyboardMarkup.create(games)
-                                )
-                            }
-                        }
-                        Command.CANCEL.name -> {
+                    user?.role?.let { userRole ->
+                        if (commandName == Command.CANCEL.name) {
                             val currentCommand = currentCommandMap[userId] ?: return@message
 
                             currentCharacterPageMap.remove(userId)
@@ -165,26 +117,84 @@ fun Application.bot(
                                 ),
                                 replyMarkup = ReplyKeyboardRemove()
                             )
+
+                            return@message
                         }
-                        else -> {
-                            if (currentCommandMap[userId] != null) return@message
 
-                            if (commandName.length < 4) return@message
+                        if ((commandName == Command.NEWGAME.name ||
+                            commandName == Command.DELETEGAME.name ||
+                            commandName == Command.NEWCHARPAGE.name ||
+                            commandName == Command.NEWCHARRANKPAGE.name) && userRole == User.Role.EDITOR) {
+                            throw User.UnauthorizedError()
+                        }
 
-                            characterPageRepository.read().filter { characterPage ->
-                                characterPage.title.normalize()
-                                    .replace(" ", "")
-                                    .contains(commandName, true)
-                            }.map { characterPage ->
-                                bot.sendMessage(chatId = ChatId.fromId(userId), text = characterPage.url)
+                        if (currentCommandMap[userId] != null) {
+                            bot.sendMessage(
+                                chatId = ChatId.fromId(userId),
+                                text = "\u2062",
+                                replyMarkup = ReplyKeyboardRemove()
+                            ).getOrNull()?.let { message ->
+                                bot.deleteMessage(chatId = ChatId.fromId(userId), messageId = message.messageId)
+                            }
+
+                            currentCharacterPageMap.remove(userId)
+                            currentGameMap.remove(userId)
+                            currentCommandMap.remove(userId)
+                        }
+
+                        if (commandName == Command.NEWGAME.name) {
+                            currentCommandMap[userId] = Command.valueOf(commandName)
+                            currentGameMap[userId] = Game()
+
+                            bot.sendMessage(
+                                chatId = ChatId.fromId(userId),
+                                text = intl.translate(id = "command.newgame.name.message")
+                            )
+
+                            return@message
+                        }
+
+                        val games = gameRepository.read().filter { game ->
+                            when (commandName) {
+                                Command.DELETEGAME.name -> characterPageRepository.read(game).isEmpty()
+                                Command.EDITCHARPAGE.name -> {
+                                    characterPageRepository.read(game).any { characterPage ->
+                                        !characterPage.isRanking
+                                    }
+                                }
+                                Command.EDITCHARRANKPAGE.name -> {
+                                    characterPageRepository.read(game).any { characterPage ->
+                                        characterPage.isRanking
+                                    }
+                                }
+                                else -> true
                             }
                         }
-                    }
+
+                        if (games.isEmpty()) {
+                            bot.sendMessage(
+                                chatId = ChatId.fromId(userId),
+                                text = intl.translate(id = "command.game.list.empty.message")
+                            )
+                        } else {
+                            currentCommandMap[userId] = Command.valueOf(commandName)
+
+                            bot.sendMessage(
+                                chatId = ChatId.fromId(userId),
+                                text = intl.translate(id = "command.game.list.message"),
+                                replyMarkup = if (commandName == Command.SETGAMESUB.name) {
+                                    val userGameSubscriptions = userGameSubscriptionRepository.read()
+
+                                    UserGameSubscriptionInlineKeyboardMarkup.create(games, userGameSubscriptions)
+                                } else GameInlineKeyboardMarkup.create(games)
+                            )
+                        }
+                    } ?: throw User.UnauthorizedError()
                 }.onFailure { error ->
                     when (error) {
-                        is Command.UnauthorizedError -> bot.sendMessage(
+                        is User.UnauthorizedError -> bot.sendMessage(
                             chatId = ChatId.fromId(userId),
-                            text = intl.translate(id = "command.unauthorized.message")
+                            text = intl.translate(id = "command.user.unauthorized.message")
                         )
                         else -> bot.sendMessage(
                             chatId = ChatId.fromId(userId),
@@ -926,8 +936,9 @@ fun Application.api(
             val users = body["users"]!!.jsonArray.map { jsonElement ->
                 val userId = jsonElement.jsonObject["id"]!!.jsonPrimitive.content.toLong()
                 val userName = jsonElement.jsonObject["name"]!!.jsonPrimitive.content
+                val userRole = jsonElement.jsonObject["role"]!!.jsonPrimitive.content.uppercase()
 
-                val user = User(userId, userName)
+                val user = User(userId, userName, User.Role.valueOf(userRole))
 
                 if (userRepository.read(user.id) == null) {
                     userRepository.create(user)
@@ -943,6 +954,7 @@ fun Application.api(
                         add(buildJsonObject {
                             put("id", user.id)
                             put("name", user.name)
+                            put("role", user.role.name.lowercase())
                         })
                     }
                 })
@@ -1007,13 +1019,12 @@ fun Application.api(
             val characterPages = pages.map { partialPage ->
                 val page = telegraphApi.getPage(partialPage.path, TelegraphApi.GetPage()).getOrThrow()
 
-                val characterPageImage =
-                    if (page.content!!.last().jsonObject["tag"]!!.jsonPrimitive.content == "figure") {
-                        val imageSrc = page.content.last().jsonObject["children"]!!.jsonArray
-                            .last().jsonObject["attrs"]!!.jsonObject["src"]!!.jsonPrimitive.content
+                val characterPageImage = if (page.content!!.last().jsonObject["tag"]!!.jsonPrimitive.content == "figure") {
+                    val imageSrc = page.content.last().jsonObject["children"]!!.jsonArray
+                        .last().jsonObject["attrs"]!!.jsonObject["src"]!!.jsonPrimitive.content
 
-                        telegraphApi.downloadImage(imageSrc)
-                    } else null
+                    telegraphApi.downloadImage(imageSrc)
+                } else null
 
                 val characterPage = CharacterPage(
                     page.path,

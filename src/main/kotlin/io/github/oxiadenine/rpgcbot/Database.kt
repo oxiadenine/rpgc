@@ -2,6 +2,7 @@ package io.github.oxiadenine.rpgcbot
 
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
+import io.github.oxiadenine.rpgcbot.repository.User
 import io.ktor.server.config.*
 import kotlinx.coroutines.Dispatchers
 import org.jetbrains.exposed.dao.id.IntIdTable
@@ -16,6 +17,7 @@ import java.sql.Connection
 object UserTable : Table("user") {
     val id = long("id").uniqueIndex()
     val name = varchar("name", 64).index()
+    val role = enumeration<User.Role>("role")
 
     override val primaryKey = PrimaryKey(id)
 }

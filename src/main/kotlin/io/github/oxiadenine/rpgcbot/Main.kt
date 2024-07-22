@@ -451,22 +451,22 @@ fun Application.bot(
                                     )
                                 )
 
-                                userGameSubscriptionRepository.read()
-                                    .filter { userGameSubscription -> userGameSubscription.userId != userId }
+                                val currentUser = userRepository.read(userId)!!
+
+                                userGameSubscriptionRepository.read(currentGame.key)
+                                    .filter { userGameSubscription -> userGameSubscription.userId != currentUser.id }
                                     .forEach { userGameSubscription ->
                                         val userIntl = bot.getChatMember(
                                             chatId = ChatId.fromId(userGameSubscription.userId),
                                             userId = userGameSubscription.userId
                                         ).getOrNull()?.user?.languageCode?.let { locale -> Intl(locale) } ?: Intl()
 
-                                        val user = userRepository.read(userGameSubscription.userId)
-
                                         bot.sendMessage(
                                             chatId = ChatId.fromId(userGameSubscription.userId),
                                             text = userIntl.translate(
                                                 id = "command.setgamesub.characterPage.created.message",
                                                 values = listOf(
-                                                    "name" to user!!.name,
+                                                    "name" to currentUser.name,
                                                     "title" to currentCharacterPage.title.value
                                                 )
                                             )
@@ -515,22 +515,22 @@ fun Application.bot(
                                     )
                                 )
 
-                                userGameSubscriptionRepository.read()
-                                    .filter { userGameSubscription -> userGameSubscription.userId != userId }
+                                val currentUser = userRepository.read(userId)!!
+
+                                userGameSubscriptionRepository.read(currentGame.key)
+                                    .filter { userGameSubscription -> userGameSubscription.userId != currentUser.id }
                                     .forEach { userGameSubscription ->
                                         val userIntl = bot.getChatMember(
                                             chatId = ChatId.fromId(userGameSubscription.userId),
                                             userId = userGameSubscription.userId
                                         ).getOrNull()?.user?.languageCode?.let { locale -> Intl(locale) } ?: Intl()
 
-                                        val user = userRepository.read(userGameSubscription.userId)
-
                                         bot.sendMessage(
                                             chatId = ChatId.fromId(userGameSubscription.userId),
                                             text = userIntl.translate(
                                                 id = "command.setgamesub.characterPage.edited.message",
                                                 values = listOf(
-                                                    "name" to user!!.name,
+                                                    "name" to currentUser.name,
                                                     "title" to currentCharacterPage.title.value
                                                 )
                                             )
@@ -671,7 +671,7 @@ fun Application.bot(
                                 url = page.url,
                                 isRanking = currentCharacterPage.isRanking,
                                 image = characterPageImage.bytes,
-                                gameKey = currentGame.key
+                                gameKey = currentCharacterPage.gameKey
                             )
 
                             characterPageRepository.create(currentCharacterPage)
@@ -684,22 +684,22 @@ fun Application.bot(
                                 )
                             )
 
-                            userGameSubscriptionRepository.read()
-                                .filter { userGameSubscription -> userGameSubscription.userId != userId }
+                            val currentUser = userRepository.read(userId)!!
+
+                            userGameSubscriptionRepository.read(currentGame.key)
+                                .filter { userGameSubscription -> userGameSubscription.userId != currentUser.id }
                                 .forEach { userGameSubscription ->
                                     val userIntl = bot.getChatMember(
                                         chatId = ChatId.fromId(userGameSubscription.userId),
                                         userId = userGameSubscription.userId
                                     ).getOrNull()?.user?.languageCode?.let { locale -> Intl(locale) } ?: Intl()
 
-                                    val user = userRepository.read(userGameSubscription.userId)
-
                                     bot.sendMessage(
                                         chatId = ChatId.fromId(userGameSubscription.userId),
                                         text = userIntl.translate(
                                             id = "command.setgamesub.characterPage.ranking.created.message",
                                             values = listOf(
-                                                "name" to user!!.name,
+                                                "name" to currentUser.name,
                                                 "title" to currentCharacterPage.title.value
                                             )
                                         )
@@ -732,22 +732,22 @@ fun Application.bot(
                                 )
                             )
 
-                            userGameSubscriptionRepository.read()
-                                .filter { userGameSubscription -> userGameSubscription.userId != userId }
+                            val currentUser = userRepository.read(userId)!!
+
+                            userGameSubscriptionRepository.read(currentGame.key)
+                                .filter { userGameSubscription -> userGameSubscription.userId != currentUser.id }
                                 .forEach { userGameSubscription ->
                                     val userIntl = bot.getChatMember(
                                         chatId = ChatId.fromId(userGameSubscription.userId),
                                         userId = userGameSubscription.userId
                                     ).getOrNull()?.user?.languageCode?.let { locale -> Intl(locale) } ?: Intl()
 
-                                    val user = userRepository.read(userGameSubscription.userId)
-
                                     bot.sendMessage(
                                         chatId = ChatId.fromId(userGameSubscription.userId),
                                         text = userIntl.translate(
                                             id = "command.setgamesub.characterPage.ranking.edited.message",
                                             values = listOf(
-                                                "name" to user!!.name,
+                                                "name" to currentUser.name,
                                                 "title" to currentCharacterPage.title.value
                                             )
                                         )

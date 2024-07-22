@@ -26,6 +26,12 @@ class UserGameSubscriptionRepository(private val database: Database) {
         }
     }
 
+    suspend fun read(gameKey: String) = database.transaction {
+        UserGameSubscriptionTable.selectAll().where { UserGameSubscriptionTable.gameKey eq gameKey }.map { record ->
+            UserGameSubscription(record[UserGameSubscriptionTable.userId], record[UserGameSubscriptionTable.gameKey])
+        }
+    }
+
     suspend fun read(userId: Long, gameKey: String) = database.transaction {
         UserGameSubscriptionTable.selectAll().where {
             (UserGameSubscriptionTable.userId eq userId) and (UserGameSubscriptionTable.gameKey eq gameKey)

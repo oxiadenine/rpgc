@@ -479,6 +479,7 @@ fun Application.bot(
                             }
                             Command.NEWCHARRANKPAGE -> {
                                 currentCharacterPageMap[userId] = CharacterPage(
+                                    path = currentCharacterPage.path,
                                     title = currentCharacterPage.title,
                                     content = characterPageContent,
                                     isRanking = currentCharacterPage.isRanking,

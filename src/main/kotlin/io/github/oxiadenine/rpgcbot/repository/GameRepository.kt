@@ -7,15 +7,14 @@ import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.update
-import java.text.Normalizer
+import java.util.UUID
 
-class Game(val key: String = "", val name: Name = Name()) {
-    class ExistsError : Error()
-
+class Game(val id: UUID = UUID.randomUUID(), val name: Name = Name()) {
     class Name(name: String? = null) {
         class BlankError : Error()
         class LengthError : Error()
         class InvalidError : Error()
+        class ExistsError : Error()
 
         val value: String = name?.let {
             if (name.isBlank()) {
@@ -32,19 +31,15 @@ class Game(val key: String = "", val name: Name = Name()) {
 
             name
         } ?: ""
-
-        fun normalize() = Normalizer.normalize(value, Normalizer.Form.NFKD)
-            .replace("\\p{M}".toRegex(), "")
-            .replace("[^a-zA-Z0-9 ]".toRegex(), "")
     }
 
-    var characterPages: List<CharacterPage> = emptyList()
+    var characters = emptyList<Character>()
 }
 
 class GameRepository(private val database: Database) {
     suspend fun create(game: Game) = database.transaction {
         GameTable.insert { statement ->
-            statement[key] = game.key
+            statement[id] = game.id
             statement[name] = game.name.value
         }
 
@@ -53,26 +48,26 @@ class GameRepository(private val database: Database) {
 
     suspend fun read() = database.transaction {
         GameTable.selectAll().map { record ->
-            Game(record[GameTable.key], Game.Name(record[GameTable.name]))
+            Game(record[GameTable.id], Game.Name(record[GameTable.name]))
         }
     }
 
-    suspend fun read(key: String) = database.transaction {
-        GameTable.selectAll().where { GameTable.key eq key }.firstOrNull()?.let { record ->
-            Game(record[GameTable.key], Game.Name(record[GameTable.name]))
+    suspend fun read(id: UUID) = database.transaction {
+        GameTable.selectAll().where { GameTable.id eq id }.firstOrNull()?.let { record ->
+            Game(record[GameTable.id], Game.Name(record[GameTable.name]))
         }
     }
 
     suspend fun update(game: Game) = database.transaction {
-        GameTable.update({ GameTable.key eq game.key }) { statement ->
+        GameTable.update({ GameTable.id eq game.id }) { statement ->
             statement[name] = game.name.value
         }
 
         Unit
     }
 
-    suspend fun delete(key: String) = database.transaction {
-        GameTable.deleteWhere { GameTable.key eq key }
+    suspend fun delete(id: UUID) = database.transaction {
+        GameTable.deleteWhere { GameTable.id eq id }
 
         Unit
     }

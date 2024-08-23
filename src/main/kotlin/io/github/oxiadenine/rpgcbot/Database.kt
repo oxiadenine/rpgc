@@ -23,27 +23,27 @@ object UserTable : Table("user") {
 }
 
 object GameTable : Table("game") {
-    val key = varchar("key", 16).uniqueIndex()
+    val id = uuid("id").uniqueIndex()
     val name = varchar("name", 64).index()
 
-    override val primaryKey = PrimaryKey(key)
+    override val primaryKey = PrimaryKey(id)
 }
 
 object UserGameSubscriptionTable : IntIdTable("user_game_subscription") {
     val userId = (long("user_id") references UserTable.id).index()
-    val gameKey = (varchar("game_key", 64) references GameTable.key).index()
+    val gameId = (uuid("game_id") references GameTable.id).index()
 }
 
-object CharacterPageTable : Table("character_page") {
-    val path = varchar("path", 128).uniqueIndex()
-    val title = varchar("title", 64).index()
+object CharacterTable : Table("character") {
+    val id = uuid("id").uniqueIndex()
+    val name = varchar("name", 64).index()
     val content = text("content")
-    val url = varchar("url", 128)
+    val image = blob("image")
+    val imageUrl = text("image_url")
     val isRanking = bool("is_ranking")
-    val image = blob("image").nullable()
-    val gameKey = (varchar("game_key", 64) references GameTable.key).index()
+    val gameId = (uuid("game_id") references GameTable.id).index()
 
-    override val primaryKey = PrimaryKey(path)
+    override val primaryKey = PrimaryKey(id)
 }
 
 class Database private constructor(private val connection: Database) {
@@ -72,7 +72,7 @@ class Database private constructor(private val connection: Database) {
                 UserTable,
                 GameTable,
                 UserGameSubscriptionTable,
-                CharacterPageTable
+                CharacterTable
             )
         }
     }

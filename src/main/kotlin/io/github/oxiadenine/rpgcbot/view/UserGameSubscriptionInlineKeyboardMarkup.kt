@@ -11,11 +11,11 @@ object UserGameSubscriptionInlineKeyboardMarkup {
         userGameSubscriptions: List<UserGameSubscription>
     ) = InlineKeyboardMarkup.create(games.map { game ->
         val hasUserGameSubscription = userGameSubscriptions.any { userGameSubscription ->
-            userGameSubscription.gameKey == game.key
+            userGameSubscription.gameId == game.id
         }
 
         listOf(InlineKeyboardButton.CallbackData(text = if (hasUserGameSubscription) {
             "\uD83D\uDD14 ${game.name.value}"
-        } else game.name.value, callbackData = game.key))
+        } else game.name.value, callbackData = game.id.toString()))
     })
 }

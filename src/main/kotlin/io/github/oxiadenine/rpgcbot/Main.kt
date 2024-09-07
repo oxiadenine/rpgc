@@ -30,6 +30,7 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.json.*
+import org.slf4j.helpers.NOPLogger
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 
@@ -726,7 +727,8 @@ fun Application.api(userRepository: UserRepository, gameRepository: GameReposito
     install(io.ktor.server.plugins.contentnegotiation.ContentNegotiation) {
         json()
     }
-    install(Routing) {
+
+    routing {
         post("/users") {
             val body = call.receive<JsonObject>()
 
@@ -817,19 +819,21 @@ fun main() {
     val userGameSubscriptionRepository = UserGameSubscriptionRepository(database)
     val characterRepository = CharacterRepository(database)
 
-    val appEngineEnv = applicationEngineEnvironment {
-        config = appConfig
-
-        module {
+    embeddedServer(
+        factory = io.ktor.server.cio.CIO,
+        environment = applicationEnvironment {
+            config = appConfig
+            log = NOPLogger.NOP_LOGGER
+        },
+        configure = {
+            connector {
+                host = appConfig.property("server.host").getString()
+                port = appConfig.property("server.port").getString().toInt()
+            }
+        },
+        module = {
             bot(telegraphApi, userRepository, gameRepository, userGameSubscriptionRepository, characterRepository)
             api(userRepository, gameRepository)
         }
-
-        connector {
-            host = config.property("server.host").getString()
-            port = config.property("server.port").getString().toInt()
-        }
-    }
-
-    embeddedServer(io.ktor.server.cio.CIO, appEngineEnv).start(true)
+    ).start(wait = true)
 }

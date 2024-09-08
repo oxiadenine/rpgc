@@ -2,10 +2,8 @@ package io.github.oxiadenine.rpgcbot.repository
 
 import io.github.oxiadenine.rpgcbot.CharacterTable
 import io.github.oxiadenine.rpgcbot.Database
-import io.github.oxiadenine.rpgcbot.toFileName
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
-import org.jetbrains.exposed.sql.statements.api.ExposedBlob
 import org.jetbrains.exposed.sql.update
 import java.util.UUID
 
@@ -13,7 +11,6 @@ class Character(
     val id: UUID = UUID.randomUUID(),
     val name: Name = Name(),
     val content: Content = Content(),
-    val image: Image = Image(),
     val isRanking: Boolean = false,
     val gameId: UUID
 ) {
@@ -56,14 +53,6 @@ class Character(
             content
         } ?: ""
     }
-
-    data class Image(
-        val name: String = "",
-        val bytes: ByteArray = byteArrayOf(),
-        val url: String = ""
-    ) {
-        val type = url.substringAfterLast(".")
-    }
 }
 
 class CharacterRepository(private val database: Database) {
@@ -72,8 +61,6 @@ class CharacterRepository(private val database: Database) {
             statement[id] = character.id
             statement[name] = character.name.value
             statement[content] = character.content.value
-            statement[image] = ExposedBlob(character.image.bytes)
-            statement[imageUrl] = character.image.url
             statement[isRanking] = character.isRanking
             statement[gameId] = character.gameId
         }
@@ -87,11 +74,6 @@ class CharacterRepository(private val database: Database) {
                 record[CharacterTable.id],
                 Character.Name(record[CharacterTable.name]),
                 Character.Content(record[CharacterTable.content]),
-                Character.Image(
-                    Character.Name(record[CharacterTable.name]).toFileName(),
-                    record[CharacterTable.image].bytes,
-                    record[CharacterTable.imageUrl],
-                ),
                 record[CharacterTable.isRanking],
                 record[CharacterTable.gameId]
             )
@@ -104,11 +86,6 @@ class CharacterRepository(private val database: Database) {
                 record[CharacterTable.id],
                 Character.Name(record[CharacterTable.name]),
                 Character.Content(record[CharacterTable.content]),
-                Character.Image(
-                    Character.Name(record[CharacterTable.name]).toFileName(),
-                    record[CharacterTable.image].bytes,
-                    record[CharacterTable.imageUrl],
-                ),
                 record[CharacterTable.isRanking],
                 record[CharacterTable.gameId]
             )
@@ -118,8 +95,6 @@ class CharacterRepository(private val database: Database) {
     suspend fun update(character: Character) = database.transaction {
         CharacterTable.update({ CharacterTable.id eq character.id }) { statement ->
             statement[content] = character.content.value
-            statement[image] = ExposedBlob(character.image.bytes)
-            statement[imageUrl] = character.image.url
         }
 
         Unit

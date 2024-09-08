@@ -38,10 +38,20 @@ object CharacterTable : Table("character") {
     val id = uuid("id").uniqueIndex()
     val name = varchar("name", 64).index()
     val content = text("content")
-    val image = blob("image")
-    val imageUrl = text("image_url")
     val isRanking = bool("is_ranking")
+
     val gameId = (uuid("game_id") references GameTable.id).index()
+
+    override val primaryKey = PrimaryKey(id)
+}
+
+object CharacterImageTable : Table("character_image") {
+    val id = text("id").uniqueIndex()
+    val name = varchar("name", 64).index()
+    val binary = blob("binary")
+    val type = varchar("type", 4)
+
+    val characterId = (uuid("character_id") references CharacterTable.id).index()
 
     override val primaryKey = PrimaryKey(id)
 }
@@ -72,7 +82,8 @@ class Database private constructor(private val connection: Database) {
                 UserTable,
                 GameTable,
                 UserGameSubscriptionTable,
-                CharacterTable
+                CharacterTable,
+                CharacterImageTable
             )
         }
     }

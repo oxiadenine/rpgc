@@ -2,5 +2,5 @@
 .kotlin/
 .gradle/
 build/
-db/
+data/
 .env

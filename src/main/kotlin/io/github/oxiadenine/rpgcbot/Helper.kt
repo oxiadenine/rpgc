@@ -1,6 +1,7 @@
 package io.github.oxiadenine.rpgcbot
 
 import com.github.kotlintelegrambot.Bot
+import com.github.kotlintelegrambot.entities.ChatId
 import com.github.kotlintelegrambot.entities.TelegramFile
 import io.github.oxiadenine.rpgcbot.repository.Character
 import org.jsoup.Jsoup
@@ -68,4 +69,12 @@ fun Bot.getAndCreateTempFile(fileId: String) = this.getFile(fileId).let { result
     tempFile.writeBytes(telegramFile.fileBytes)
 
     tempFile!!
+}
+
+fun Bot.sendDocumentAndGetFileId(chatId: ChatId, document: TelegramFile) = this.sendDocument(chatId, document).let { result ->
+    result.first?.let { response ->
+        if (response.isSuccessful) {
+            response.body()!!.result!!.document!!.fileId
+        } else error(response.message())
+    } ?: throw result.second!!
 }

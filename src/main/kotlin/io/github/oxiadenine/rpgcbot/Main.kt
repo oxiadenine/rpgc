@@ -9,19 +9,12 @@ import com.github.kotlintelegrambot.entities.ChatId
 import com.github.kotlintelegrambot.entities.ReplyKeyboardRemove
 import com.github.kotlintelegrambot.entities.TelegramFile
 import com.github.kotlintelegrambot.entities.inlinequeryresults.InlineQueryResult
-import com.github.kotlintelegrambot.entities.inlinequeryresults.InputMessageContent
 import com.github.kotlintelegrambot.extensions.filters.Filter
 import com.typesafe.config.ConfigFactory
-import io.github.oxiadenine.rpgcbot.network.TelegraphApi
 import io.github.oxiadenine.rpgcbot.repository.*
 import io.github.oxiadenine.rpgcbot.view.CharacterKeyboardReplyMarkup
 import io.github.oxiadenine.rpgcbot.view.GameInlineKeyboardMarkup
 import io.github.oxiadenine.rpgcbot.view.UserGameSubscriptionInlineKeyboardMarkup
-import io.ktor.client.*
-import io.ktor.client.engine.cio.*
-import io.ktor.client.plugins.*
-import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.config.*
@@ -47,20 +40,22 @@ enum class Command {
 }
 
 fun Application.bot(
-    telegraphApi: TelegraphApi,
     userRepository: UserRepository,
     gameRepository: GameRepository,
     userGameSubscriptionRepository: UserGameSubscriptionRepository,
-    characterRepository: CharacterRepository
+    characterRepository: CharacterRepository,
+    characterImageRepository: CharacterImageRepository
 ) {
     val appConfig =  environment.config
 
     val bot = bot {
-        token = appConfig.config("bot").property("token").getString()
+        token = appConfig.config("telegram").property("token").getString()
 
         val currentCommandMap = ConcurrentHashMap<Long, Command>()
         val currentGameMap = ConcurrentHashMap<Long, Game>()
         val currentCharacterMap = ConcurrentHashMap<Long, Character>()
+
+        val channelUsername = appConfig.config("telegram").property("channelUsername").getString()
 
         dispatch {
             message(Filter.Command) {
@@ -89,14 +84,16 @@ fun Application.bot(
 
                     characterRepository.read().filter { character ->
                         character.name.toCommandName().contains(commandName, true)
-                    }.map { character ->
-                        bot.sendDocument(
-                            chatId = ChatId.fromId(userId),
-                            document = TelegramFile.ByByteArray(
-                                fileBytes = character.image.bytes,
-                                filename = "${character.image.name}.${character.image.type}"
+                    }.forEach { character ->
+                        characterImageRepository.read(character.id)?.let { characterImage ->
+                            bot.sendDocument(
+                                chatId = ChatId.fromId(userId),
+                                document = TelegramFile.ByByteArray(
+                                    fileBytes = characterImage.bytes,
+                                    filename = "${characterImage.name}.${characterImage.type}"
+                                )
                             )
-                        )
+                        }
                     }
 
                     return@message
@@ -337,7 +334,15 @@ fun Application.bot(
                             Command.NEWCHAR, Command.EDITCHAR -> {
                                 val characterContent = Character.Content(message.text!!)
 
-                                val characterDocument = characterContent.value.toHTMLDocument()
+                                currentCharacter = Character(
+                                    id = currentCharacter.id,
+                                    name = currentCharacter.name,
+                                    content = characterContent,
+                                    isRanking = currentCharacter.isRanking,
+                                    gameId = currentCharacter.gameId
+                                )
+
+                                val characterDocument = currentCharacter.content.value.toHTMLDocument()
 
                                 val characterNameElement = characterDocument.getElementById("character-name")!!
                                 characterNameElement.appendText(currentCharacter.name.value)
@@ -347,22 +352,28 @@ fun Application.bot(
 
                                 val characterImageName = currentCharacter.name.toFileName()
                                 val characterImageBytes = characterDocument.toXHTMLDocument().renderToImage(width = 2048)
-                                val characterImageUrl = telegraphApi.uploadImage(characterImageBytes, characterImageName)
 
-                                val characterImage = Character.Image(characterImageName, characterImageBytes, characterImageUrl)
-
-                                currentCharacter = Character(
-                                    id = currentCharacter.id,
-                                    name = currentCharacter.name,
-                                    content = characterContent,
-                                    image = characterImage,
-                                    isRanking = currentCharacter.isRanking,
-                                    gameId = currentCharacter.gameId
-                                )
+                                val currentCharacterImage = CharacterImage(
+                                    name = characterImageName,
+                                    bytes = characterImageBytes,
+                                    characterId = currentCharacter.id
+                                ).apply {
+                                    id = bot.sendDocumentAndGetFileId(
+                                        chatId = ChatId.fromChannelUsername(channelUsername),
+                                        document = TelegramFile.ByByteArray(bytes, "$name.$type")
+                                    )
+                                }
 
                                 if (currentCommand == Command.NEWCHAR) {
                                     characterRepository.create(currentCharacter)
-                                } else characterRepository.update(currentCharacter)
+                                    characterImageRepository.create(currentCharacterImage)
+                                } else {
+                                    characterRepository.update(currentCharacter)
+                                    characterImageRepository.read(currentCharacter.id)?.let { characterImage ->
+                                        characterImageRepository.delete(characterImage.id)
+                                        characterImageRepository.create(currentCharacterImage)
+                                    }
+                                }
 
                                 bot.sendMessage(
                                     chatId = ChatId.fromId(userId),
@@ -491,6 +502,14 @@ fun Application.bot(
                 runCatching {
                     when (currentCommand) {
                         Command.NEWCHARRANK, Command.EDITCHARRANK -> {
+                            currentCharacter = Character(
+                                id = currentCharacter.id,
+                                name = currentCharacter.name,
+                                content = currentCharacter.content,
+                                isRanking = currentCharacter.isRanking,
+                                gameId = currentCharacter.gameId
+                            )
+
                             val characterContentImageFile = bot.getAndCreateTempFile(message.photo!!.last().fileId)
 
                             val characterDocument = currentCharacter.content.value.toHTMLDocument()
@@ -506,22 +525,28 @@ fun Application.bot(
 
                             val characterImageName = currentCharacter.name.toFileName()
                             val characterImageBytes = characterDocument.toXHTMLDocument().renderToImage(width = 2048)
-                            val characterImageUrl = telegraphApi.uploadImage(characterImageBytes, characterImageName)
 
-                            val characterImage = Character.Image(characterImageName, characterImageBytes, characterImageUrl)
-
-                            currentCharacter = Character(
-                                id = currentCharacter.id,
-                                name = currentCharacter.name,
-                                content = currentCharacter.content,
-                                image = characterImage,
-                                isRanking = currentCharacter.isRanking,
-                                gameId = currentCharacter.gameId
-                            )
+                            val currentCharacterImage = CharacterImage(
+                                name = characterImageName,
+                                bytes = characterImageBytes,
+                                characterId = currentCharacter.id
+                            ).apply {
+                                id = bot.sendDocumentAndGetFileId(
+                                    chatId = ChatId.fromChannelUsername(channelUsername),
+                                    document = TelegramFile.ByByteArray(bytes, "$name.$type")
+                                )
+                            }
 
                             if (currentCommand == Command.NEWCHARRANK) {
                                 characterRepository.create(currentCharacter)
-                            } else characterRepository.update(currentCharacter)
+                                characterImageRepository.create(currentCharacterImage)
+                            } else {
+                                characterRepository.update(currentCharacter)
+                                characterImageRepository.read(currentCharacter.id)?.let { characterImage ->
+                                    characterImageRepository.delete(characterImage.id)
+                                    characterImageRepository.create(currentCharacterImage)
+                                }
+                            }
 
                             bot.sendMessage(
                                 chatId = ChatId.fromId(userId),
@@ -695,16 +720,15 @@ fun Application.bot(
 
                         characterRepository.read().filter { character ->
                             character.name.value.normalize().contains(characterName.value.normalize(), true)
-                        }.map { character ->
-                            InlineQueryResult.Article(
-                                id = character.id.toString(),
-                                title = character.name.value,
-                                url = character.image.url,
-                                hideUrl = true,
-                                thumbUrl = character.image.url,
-                                inputMessageContent = InputMessageContent.Text(messageText = character.image.url),
-                                description = gameRepository.read(character.gameId)!!.name.value
-                            )
+                        }.mapNotNull { character ->
+                            characterImageRepository.read(character.id)?.let { characterImage ->
+                                InlineQueryResult.CachedDocument(
+                                    id = character.id.toString(),
+                                    title = character.name.value,
+                                    documentFileId = characterImage.id,
+                                    description = gameRepository.read(character.gameId)!!.name.value
+                                )
+                            }
                         }
                     } catch (_: Error) {
                         emptyList()
@@ -796,28 +820,13 @@ fun Application.api(userRepository: UserRepository, gameRepository: GameReposito
 fun main() {
     val appConfig = HoconApplicationConfig(ConfigFactory.load())
 
-    val httpClient = HttpClient(CIO) {
-        install(ContentNegotiation) {
-            json(Json {
-                explicitNulls = false
-                encodeDefaults = true
-            })
-        }
-        install(DefaultRequest) {
-            contentType(ContentType.Application.Json)
-        }
-
-        expectSuccess = true
-    }
-
-    val telegraphApi = TelegraphApi(httpClient)
-
     val database = Database.create(appConfig.config("database"))
 
     val userRepository = UserRepository(database)
     val gameRepository = GameRepository(database)
     val userGameSubscriptionRepository = UserGameSubscriptionRepository(database)
     val characterRepository = CharacterRepository(database)
+    val characterImageRepository = CharacterImageRepository(database)
 
     embeddedServer(
         factory = io.ktor.server.cio.CIO,
@@ -832,7 +841,13 @@ fun main() {
             }
         },
         module = {
-            bot(telegraphApi, userRepository, gameRepository, userGameSubscriptionRepository, characterRepository)
+            bot(
+                userRepository,
+                gameRepository,
+                userGameSubscriptionRepository,
+                characterRepository,
+                characterImageRepository
+            )
             api(userRepository, gameRepository)
         }
     ).start(wait = true)

@@ -3,7 +3,7 @@
 .kotlin
 .gradle
 build
-db
+data
 .env*
 Dockerfile
 docker-compose.yml

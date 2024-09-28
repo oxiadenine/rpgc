@@ -21,6 +21,7 @@ dependencies {
     val exposedVersion = properties["exposed.version"] as String
     val hikaricpVersion = properties["hikaricp.version"] as String
     val h2databaseVersion = properties["h2database.version"] as String
+    val logbackVersion = properties["logback.version"] as String
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$kotlinxCoroutinesVersion")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:$kotlinxSerializationVersion")
@@ -37,6 +38,7 @@ dependencies {
     implementation("org.jetbrains.exposed:exposed-jdbc:$exposedVersion")
     implementation("com.zaxxer:HikariCP:$hikaricpVersion")
     implementation("com.h2database:h2:$h2databaseVersion")
+    implementation("ch.qos.logback:logback-classic:$logbackVersion")
 
     testImplementation(kotlin("test"))
 }

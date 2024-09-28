@@ -5,6 +5,7 @@ import com.github.kotlintelegrambot.dispatch
 import com.github.kotlintelegrambot.dispatcher.callbackQuery
 import com.github.kotlintelegrambot.dispatcher.inlineQuery
 import com.github.kotlintelegrambot.dispatcher.message
+import com.github.kotlintelegrambot.dispatcher.telegramError
 import com.github.kotlintelegrambot.entities.ChatId
 import com.github.kotlintelegrambot.entities.ReplyKeyboardRemove
 import com.github.kotlintelegrambot.entities.TelegramFile
@@ -23,7 +24,6 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.json.*
-import org.slf4j.helpers.NOPLogger
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 
@@ -189,10 +189,14 @@ fun Application.bot(
                             chatId = ChatId.fromId(userId),
                             text = intl.translate(id = "command.user.unauthorized.message")
                         )
-                        else -> bot.sendMessage(
-                            chatId = ChatId.fromId(userId),
-                            text = intl.translate(id = "command.error.message")
-                        )
+                        else -> {
+                            log.info(error.stackTraceToString())
+
+                            bot.sendMessage(
+                                chatId = ChatId.fromId(userId),
+                                text = intl.translate(id = "command.error.message")
+                            )
+                        }
                     }
                 }
             }
@@ -254,14 +258,16 @@ fun Application.bot(
                             text = intl.translate(id = "command.newgame.name.exists.message")
                         )
                         else -> {
+                            log.info(error.stackTraceToString())
+
+                            currentGameMap.remove(userId)
+                            currentCommandMap.remove(userId)
+
                             bot.sendMessage(
                                 chatId = ChatId.fromId(userId),
                                 text = intl.translate("command.error.message"),
                                 replyMarkup = ReplyKeyboardRemove()
                             )
-
-                            currentGameMap.remove(userId)
-                            currentCommandMap.remove(userId)
                         }
                     }
                 }
@@ -473,15 +479,17 @@ fun Application.bot(
                             } else "command.newchar.content.length.message")
                         )
                         else -> {
+                            log.info(error.stackTraceToString())
+
+                            currentCharacterMap.remove(userId)
+                            currentGameMap.remove(userId)
+                            currentCommandMap.remove(userId)
+
                             bot.sendMessage(
                                 chatId = ChatId.fromId(userId),
                                 text = intl.translate("command.error.message"),
                                 replyMarkup = ReplyKeyboardRemove()
                             )
-
-                            currentCharacterMap.remove(userId)
-                            currentGameMap.remove(userId)
-                            currentCommandMap.remove(userId)
                         }
                     }
                 }
@@ -587,16 +595,18 @@ fun Application.bot(
 
                     currentGameMap.remove(userId)
                     currentCommandMap.remove(userId)
-                }.onFailure {
+                }.onFailure { error ->
+                    log.info(error.stackTraceToString())
+
+                    currentCharacterMap.remove(userId)
+                    currentGameMap.remove(userId)
+                    currentCommandMap.remove(userId)
+
                     bot.sendMessage(
                         chatId = ChatId.fromId(userId),
                         text = intl.translate(id = "command.error.message"),
                         replyMarkup = ReplyKeyboardRemove()
                     )
-
-                    currentCharacterMap.remove(userId)
-                    currentGameMap.remove(userId)
-                    currentCommandMap.remove(userId)
                 }
             }
 
@@ -695,15 +705,17 @@ fun Application.bot(
                         }
                         else -> return@callbackQuery
                     }
-                }.onFailure {
-                    bot.sendMessage(
-                        chatId = ChatId.fromId(userId),
-                        text = intl.translate(id = "command.error.message")
-                    )
+                }.onFailure { error ->
+                    log.info(error.stackTraceToString())
 
                     currentCharacterMap.remove(userId)
                     currentGameMap.remove(userId)
                     currentCommandMap.remove(userId)
+
+                    bot.sendMessage(
+                        chatId = ChatId.fromId(userId),
+                        text = intl.translate(id = "command.error.message")
+                    )
                 }
             }
 
@@ -740,6 +752,10 @@ fun Application.bot(
                     cacheTime = 0,
                     inlineQueryResults = characterInlineQueryResults
                 )
+            }
+
+            telegramError {
+                log.info(error.getErrorMessage())
             }
         }
     }
@@ -830,10 +846,7 @@ fun main() {
 
     embeddedServer(
         factory = io.ktor.server.cio.CIO,
-        environment = applicationEnvironment {
-            config = appConfig
-            log = NOPLogger.NOP_LOGGER
-        },
+        environment = applicationEnvironment { config = appConfig },
         configure = {
             connector {
                 host = appConfig.property("server.host").getString()

@@ -3,15 +3,17 @@ package io.github.oxiadenine.rpgcbot
 import com.github.kotlintelegrambot.Bot
 import com.github.kotlintelegrambot.entities.ChatId
 import com.github.kotlintelegrambot.entities.TelegramFile
+import com.openhtmltopdf.java2d.api.BufferedImagePageProcessor
+import com.openhtmltopdf.java2d.api.Java2DRendererBuilder
 import io.github.oxiadenine.rpgcbot.repository.Character
 import org.jsoup.Jsoup
-import org.w3c.dom.Document
-import org.xhtmlrenderer.swing.Java2DRenderer
-import org.xhtmlrenderer.util.FSImageWriter
+import org.jsoup.nodes.Document
 import org.xml.sax.InputSource
+import java.awt.image.BufferedImage
 import java.io.ByteArrayOutputStream
-import java.io.StringReader
+import java.io.File
 import java.text.Normalizer
+import javax.imageio.ImageIO
 import javax.xml.parsers.DocumentBuilderFactory
 import kotlin.io.path.createTempFile
 
@@ -29,20 +31,31 @@ fun Character.Name.toFileName() = this.value
     .replace(" ", "-")
     .lowercase()
 
-fun String.toHTMLDocument(): org.jsoup.nodes.Document = Jsoup.parse(this)
+fun String.toHTMLDocument(): Document = Jsoup.parse(this)
 
-fun org.jsoup.nodes.Document.toXHTMLDocument(): Document {
-    this.outputSettings().syntax(org.jsoup.nodes.Document.OutputSettings.Syntax.xml)
+fun Document.renderToImage(width: Int): ByteArray = ByteArrayOutputStream().use { outputStream ->
+    this.head().getElementsByTag("style")[0].appendText("""
+        @page {
+          size: ${width}px 1px;
+          margin: 0;
+        }
+    """.trimIndent())
 
-    return DocumentBuilderFactory.newDefaultInstance().newDocumentBuilder().parse(InputSource(StringReader(this.html())))
-}
+    this.outputSettings().syntax(Document.OutputSettings.Syntax.xml)
 
-fun Document.renderToImage(width: Int, height: Int? = null): ByteArray = ByteArrayOutputStream().use { outputStream ->
-    val graphicRenderer = if (height != null) {
-        Java2DRenderer(this, width, height)
-    } else Java2DRenderer(this, width)
+    val xhtmlDocument = DocumentBuilderFactory.newInstance().newDocumentBuilder()
+        .parse(InputSource(this.html().toByteArray().inputStream()))
 
-    FSImageWriter().write(graphicRenderer.image, outputStream)
+    val rendererBuilder = Java2DRendererBuilder()
+    val imagePageProcessor = BufferedImagePageProcessor(BufferedImage.TYPE_INT_RGB, 1.0)
+
+    rendererBuilder.withW3cDocument(xhtmlDocument, File("").toURI().toString())
+    rendererBuilder.useFastMode()
+    rendererBuilder.useEnvironmentFonts(true)
+    rendererBuilder.toSinglePage(imagePageProcessor)
+    rendererBuilder.runFirstPage()
+
+    ImageIO.write(imagePageProcessor.pageImages[0], "png", outputStream)
 
     outputStream.toByteArray()
 }

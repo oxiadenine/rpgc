@@ -357,7 +357,7 @@ fun Application.bot(
                                 gameNameElement.appendText(currentGame.name.value)
 
                                 val characterImageName = currentCharacter.name.toFileName()
-                                val characterImageBytes = characterDocument.toXHTMLDocument().renderToImage(width = 2048)
+                                val characterImageBytes = characterDocument.renderToImage(width = 2048)
 
                                 val currentCharacterImage = CharacterImage(
                                     name = characterImageName,
@@ -532,7 +532,7 @@ fun Application.bot(
                             characterContentImageElement.attr("src", "file://${characterContentImageFile.absolutePath}")
 
                             val characterImageName = currentCharacter.name.toFileName()
-                            val characterImageBytes = characterDocument.toXHTMLDocument().renderToImage(width = 2048)
+                            val characterImageBytes = characterDocument.renderToImage(width = 2048)
 
                             val currentCharacterImage = CharacterImage(
                                 name = characterImageName,

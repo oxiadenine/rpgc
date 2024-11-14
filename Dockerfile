@@ -1,4 +1,4 @@
-FROM gradle:8.8-jdk21 AS build
+FROM gradle:8.11-jdk21 AS build
 
 WORKDIR /home/gradle/src
 
@@ -6,7 +6,7 @@ COPY . .
 
 RUN chown -R gradle:gradle ./ && gradle build --no-daemon
 
-FROM eclipse-temurin:21.0.1_12-jre
+FROM eclipse-temurin:21.0.5_11-jre
 
 RUN useradd java
 

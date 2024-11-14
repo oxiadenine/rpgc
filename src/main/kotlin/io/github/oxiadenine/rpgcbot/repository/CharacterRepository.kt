@@ -12,7 +12,7 @@ class Character(
     val name: Name = Name(),
     val content: Content = Content(),
     val isRanking: Boolean = false,
-    val gameId: UUID
+    val game: Game? = null
 ) {
     class Name(name: String? = null) {
         class BlankError : Error()
@@ -37,7 +37,7 @@ class Character(
         } ?: ""
     }
 
-    class Content(content: String? = null) {
+    class Content(content: String? = null, val imageFilePath: String? = null) {
         class BlankError : Error()
         class LengthError : Error()
 
@@ -62,7 +62,7 @@ class CharacterRepository(private val database: Database) {
             statement[name] = character.name.value
             statement[content] = character.content.value
             statement[isRanking] = character.isRanking
-            statement[gameId] = character.gameId
+            statement[gameId] = character.game!!.id
         }
 
         Unit
@@ -74,8 +74,7 @@ class CharacterRepository(private val database: Database) {
                 record[CharacterTable.id],
                 Character.Name(record[CharacterTable.name]),
                 Character.Content(record[CharacterTable.content]),
-                record[CharacterTable.isRanking],
-                record[CharacterTable.gameId]
+                record[CharacterTable.isRanking]
             )
         }
     }
@@ -86,8 +85,7 @@ class CharacterRepository(private val database: Database) {
                 record[CharacterTable.id],
                 Character.Name(record[CharacterTable.name]),
                 Character.Content(record[CharacterTable.content]),
-                record[CharacterTable.isRanking],
-                record[CharacterTable.gameId]
+                record[CharacterTable.isRanking]
             )
         }
     }

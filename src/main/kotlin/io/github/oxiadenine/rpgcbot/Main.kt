@@ -48,6 +48,8 @@ fun Application.bot(
 ) {
     val appConfig =  environment.config
 
+    val characterTemplatePath = appConfig.property("bot.character.templatePath").getString()
+
     val bot = bot {
         token = appConfig.config("telegram").property("token").getString()
 
@@ -292,7 +294,7 @@ fun Application.bot(
                                     id = currentCharacter.id,
                                     name = characterName,
                                     isRanking = currentCharacter.isRanking,
-                                    gameId = currentCharacter.gameId
+                                    game = currentCharacter.game
                                 )
 
                                 bot.sendMessage(
@@ -311,7 +313,7 @@ fun Application.bot(
                                     id = character.id,
                                     name = character.name,
                                     isRanking = character.isRanking,
-                                    gameId = character.gameId
+                                    game = currentCharacter.game
                                 )
 
                                 bot.sendMessage(
@@ -345,19 +347,11 @@ fun Application.bot(
                                     name = currentCharacter.name,
                                     content = characterContent,
                                     isRanking = currentCharacter.isRanking,
-                                    gameId = currentCharacter.gameId
+                                    game = currentCharacter.game
                                 )
 
-                                val characterDocument = currentCharacter.content.value.toHTMLDocument()
-
-                                val characterNameElement = characterDocument.getElementById("character-name")!!
-                                characterNameElement.appendText(currentCharacter.name.value)
-
-                                val gameNameElement = characterDocument.getElementById("game-name")!!
-                                gameNameElement.appendText(currentGame.name.value)
-
                                 val characterImageName = currentCharacter.name.toFileName()
-                                val characterImageBytes = characterDocument.renderToImage(width = 2048)
+                                val characterImageBytes = currentCharacter.renderToImage(characterTemplatePath, width = 2048)
 
                                 val currentCharacterImage = CharacterImage(
                                     name = characterImageName,
@@ -427,7 +421,7 @@ fun Application.bot(
                                     name = currentCharacter.name,
                                     content = characterContent,
                                     isRanking = currentCharacter.isRanking,
-                                    gameId = currentCharacter.gameId
+                                    game = currentCharacter.game
                                 )
 
                                 bot.sendMessage(
@@ -510,29 +504,21 @@ fun Application.bot(
                 runCatching {
                     when (currentCommand) {
                         Command.NEWCHARRANK, Command.EDITCHARRANK -> {
+                            val characterContent = Character.Content(
+                                currentCharacter.content.value,
+                                bot.getAndCreateTempFile(message.photo!!.last().fileId).absolutePath
+                            )
+
                             currentCharacter = Character(
                                 id = currentCharacter.id,
                                 name = currentCharacter.name,
-                                content = currentCharacter.content,
+                                content = characterContent,
                                 isRanking = currentCharacter.isRanking,
-                                gameId = currentCharacter.gameId
+                                game = currentCharacter.game
                             )
 
-                            val characterContentImageFile = bot.getAndCreateTempFile(message.photo!!.last().fileId)
-
-                            val characterDocument = currentCharacter.content.value.toHTMLDocument()
-
-                            val characterNameElement = characterDocument.getElementById("character-name")!!
-                            characterNameElement.appendText(currentCharacter.name.value)
-
-                            val gameNameElement = characterDocument.getElementById("game-name")!!
-                            gameNameElement.appendText(currentGame.name.value)
-
-                            val characterContentImageElement = characterDocument.getElementById("character-content-image")!!
-                            characterContentImageElement.attr("src", "file://${characterContentImageFile.absolutePath}")
-
                             val characterImageName = currentCharacter.name.toFileName()
-                            val characterImageBytes = characterDocument.renderToImage(width = 2048)
+                            val characterImageBytes = currentCharacter.renderToImage(characterTemplatePath, width = 2048)
 
                             val currentCharacterImage = CharacterImage(
                                 name = characterImageName,
@@ -672,7 +658,7 @@ fun Application.bot(
                             currentGameMap[userId] = game
                             currentCharacterMap[userId] = Character(
                                 isRanking = characterIsRanking,
-                                gameId = game.id
+                                game = game
                             )
 
                             bot.sendMessage(
@@ -692,7 +678,7 @@ fun Application.bot(
                             currentGameMap[userId] = game
                             currentCharacterMap[userId] = Character(
                                 isRanking = characterIsRanking,
-                                gameId = game.id
+                                game = game
                             )
 
                             bot.sendMessage(
@@ -738,7 +724,7 @@ fun Application.bot(
                                     id = character.id.toString(),
                                     title = character.name.value,
                                     documentFileId = characterImage.id,
-                                    description = gameRepository.read(character.gameId)!!.name.value
+                                    description = gameRepository.read(character.game!!.id)!!.name.value
                                 )
                             }
                         }

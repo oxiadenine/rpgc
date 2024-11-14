@@ -8,7 +8,6 @@ import com.openhtmltopdf.java2d.api.Java2DRendererBuilder
 import io.github.oxiadenine.rpgcbot.repository.Character
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
-import org.xml.sax.InputSource
 import java.awt.image.BufferedImage
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -31,25 +30,44 @@ fun Character.Name.toFileName() = this.value
     .replace(" ", "-")
     .lowercase()
 
-fun String.toHTMLDocument(): Document = Jsoup.parse(this)
+fun Character.renderToImage(templatePath: String, width: Int): ByteArray = ByteArrayOutputStream().use { outputStream ->
+    val characterTemplateFile = File(templatePath)
 
-fun Document.renderToImage(width: Int): ByteArray = ByteArrayOutputStream().use { outputStream ->
-    this.head().getElementsByTag("style")[0].appendText("""
+    val characterDocument = Jsoup.parse(characterTemplateFile)
+
+    characterDocument.select("#character-name")[0].appendText(this.name.value)
+    characterDocument.select("#game-name")[0].appendText(this.game!!.name.value)
+
+    val characterContentDocument = Jsoup.parse(this.content.value)
+
+    characterDocument.select("div.row")[0]
+        .appendChildren(characterContentDocument.select("div.column"))
+
+    if (this.isRanking) {
+        characterDocument.select("#character-content-image")[0]
+            .attr("src", "file://${this.content.imageFilePath}")
+    }
+
+    characterDocument.select("style")[0]
+        .appendText(characterContentDocument.select("style")[0].html())
+
+    characterDocument.head().select("style")[0].appendText("""
         @page {
           size: ${width}px 1px;
           margin: 0;
         }
     """.trimIndent())
 
-    this.outputSettings().syntax(Document.OutputSettings.Syntax.xml)
+    characterDocument.outputSettings().syntax(Document.OutputSettings.Syntax.xml)
 
     val xhtmlDocument = DocumentBuilderFactory.newInstance().newDocumentBuilder()
-        .parse(InputSource(this.html().toByteArray().inputStream()))
+        .parse(characterDocument.html().toByteArray().inputStream())
+    xhtmlDocument.documentURI = characterTemplateFile.toURI().toString()
 
     val rendererBuilder = Java2DRendererBuilder()
     val imagePageProcessor = BufferedImagePageProcessor(BufferedImage.TYPE_INT_RGB, 1.0)
 
-    rendererBuilder.withW3cDocument(xhtmlDocument, File("").toURI().toString())
+    rendererBuilder.withW3cDocument(xhtmlDocument, xhtmlDocument.baseURI)
     rendererBuilder.useFastMode()
     rendererBuilder.useEnvironmentFonts(true)
     rendererBuilder.toSinglePage(imagePageProcessor)

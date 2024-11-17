@@ -6,9 +6,7 @@ import io.github.oxiadenine.rpgcbot.repository.Character
 
 object CharacterKeyboardReplyMarkup {
     fun create(characters: List<Character>) = KeyboardReplyMarkup(
-        keyboard = characters.map { character ->
-            listOf(KeyboardButton(text = character.name.value))
-        },
+        keyboard = characters.map { character -> listOf(KeyboardButton(text = character.name.value)) },
         resizeKeyboard = true,
         oneTimeKeyboard = true
     )

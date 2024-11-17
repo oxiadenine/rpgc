@@ -51,13 +51,13 @@ fun Application.bot(
     val characterTemplatePath = appConfig.property("bot.character.templatePath").getString()
 
     val bot = bot {
-        token = appConfig.config("telegram").property("token").getString()
+        token = appConfig.property("telegram.token").getString()
 
         val currentCommandMap = ConcurrentHashMap<Long, Command>()
         val currentGameMap = ConcurrentHashMap<Long, Game>()
         val currentCharacterMap = ConcurrentHashMap<Long, Character>()
 
-        val channelUsername = appConfig.config("telegram").property("channelUsername").getString()
+        val channelUsername = appConfig.property("telegram.channelUsername").getString()
 
         dispatch {
             message(Filter.Command) {
@@ -656,10 +656,7 @@ fun Application.bot(
                             }
 
                             currentGameMap[userId] = game
-                            currentCharacterMap[userId] = Character(
-                                isRanking = characterIsRanking,
-                                game = game
-                            )
+                            currentCharacterMap[userId] = Character(isRanking = characterIsRanking, game = game)
 
                             bot.sendMessage(
                                 chatId = ChatId.fromId(userId),
@@ -676,10 +673,7 @@ fun Application.bot(
                             }.sortedBy { character -> character.name.value }
 
                             currentGameMap[userId] = game
-                            currentCharacterMap[userId] = Character(
-                                isRanking = characterIsRanking,
-                                game = game
-                            )
+                            currentCharacterMap[userId] = Character(isRanking = characterIsRanking, game = game)
 
                             bot.sendMessage(
                                 chatId = ChatId.fromId(userId),
@@ -740,9 +734,7 @@ fun Application.bot(
                 )
             }
 
-            telegramError {
-                log.info(error.getErrorMessage())
-            }
+            telegramError { log.info(error.getErrorMessage()) }
         }
     }
 
@@ -750,9 +742,7 @@ fun Application.bot(
 }
 
 fun Application.api(userRepository: UserRepository, gameRepository: GameRepository) {
-    install(io.ktor.server.plugins.contentnegotiation.ContentNegotiation) {
-        json()
-    }
+    install(io.ktor.server.plugins.contentnegotiation.ContentNegotiation) { json() }
 
     routing {
         post("/users") {

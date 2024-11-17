@@ -78,13 +78,7 @@ class Database private constructor(private val connection: Database) {
 
     init {
         transaction(connection) {
-            SchemaUtils.create(
-                UserTable,
-                GameTable,
-                UserGameSubscriptionTable,
-                CharacterTable,
-                CharacterImageTable
-            )
+            SchemaUtils.create(UserTable, GameTable, UserGameSubscriptionTable, CharacterTable, CharacterImageTable)
         }
     }
 

@@ -1,3 +1,3 @@
 # RPGc Bot
 
-A [Telegram Bot](https://core.telegram.org/bots/) to create and edit characters and character rankings images from HTML content.
+A [Telegram Bot](https://core.telegram.org/bots/) to create and edit images of characters and character rankings from HTML content.

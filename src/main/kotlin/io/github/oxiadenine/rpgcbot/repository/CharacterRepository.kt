@@ -74,18 +74,20 @@ class CharacterRepository(private val database: Database) {
                 record[CharacterTable.id],
                 Character.Name(record[CharacterTable.name]),
                 Character.Content(record[CharacterTable.content]),
-                record[CharacterTable.isRanking]
+                record[CharacterTable.isRanking],
+                Game(record[CharacterTable.gameId])
             )
         }
     }
 
-    suspend fun read(game: Game) = database.transaction {
-        CharacterTable.selectAll().where { CharacterTable.gameId eq game.id }.map { record ->
+    suspend fun read(gameId: UUID) = database.transaction {
+        CharacterTable.selectAll().where { CharacterTable.gameId eq gameId }.map { record ->
             Character(
                 record[CharacterTable.id],
                 Character.Name(record[CharacterTable.name]),
                 Character.Content(record[CharacterTable.content]),
-                record[CharacterTable.isRanking]
+                record[CharacterTable.isRanking],
+                Game(record[CharacterTable.gameId])
             )
         }
     }

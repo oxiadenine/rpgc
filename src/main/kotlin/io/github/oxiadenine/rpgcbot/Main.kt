@@ -156,7 +156,7 @@ fun Application.bot(
                         }
 
                         val games = gameRepository.read().filter { game ->
-                            val characters = characterRepository.read(game)
+                            val characters = characterRepository.read(game.id)
 
                             when (commandName) {
                                 Command.DELETEGAME.name -> characters.isEmpty()
@@ -651,7 +651,7 @@ fun Application.bot(
                         Command.NEWCHAR, Command.NEWCHARRANK -> {
                             val characterIsRanking = currentCommand != Command.NEWCHAR
 
-                            game.characters = characterRepository.read(game).filter { character ->
+                            game.characters = characterRepository.read(game.id).filter { character ->
                                 character.isRanking == characterIsRanking
                             }
 
@@ -668,7 +668,7 @@ fun Application.bot(
                         Command.EDITCHAR, Command.EDITCHARRANK -> {
                             val characterIsRanking = currentCommand != Command.EDITCHAR
 
-                            game.characters = characterRepository.read(game).filter { character ->
+                            game.characters = characterRepository.read(game.id).filter { character ->
                                 character.isRanking == characterIsRanking
                             }.sortedBy { character -> character.name.value }
 

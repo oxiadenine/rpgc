@@ -745,21 +745,73 @@ fun Application.api(userRepository: UserRepository, gameRepository: GameReposito
     install(io.ktor.server.plugins.contentnegotiation.ContentNegotiation) { json() }
 
     routing {
+        get("/users") {
+            val users = userRepository.read()
+
+            val response = buildJsonObject {
+                put("ok", true)
+                put("result", buildJsonArray {
+                    users.map { user ->
+                        add(buildJsonObject {
+                            put("id", user.id)
+                            put("name", user.name)
+                            put("role", user.role.name.lowercase())
+                        })
+                    }
+                })
+            }
+
+            call.respond(response)
+        }
         post("/users") {
             val body = call.receive<JsonObject>()
 
-            val users = body["users"]!!.jsonArray.map { jsonElement ->
+            val users = mutableListOf<JsonObject>()
+
+            body["users"]!!.jsonArray.forEach { jsonElement ->
                 val userId = jsonElement.jsonObject["id"]!!.jsonPrimitive.content.toLong()
                 val userName = jsonElement.jsonObject["name"]!!.jsonPrimitive.content
                 val userRole = jsonElement.jsonObject["role"]!!.jsonPrimitive.content.uppercase()
 
                 val user = User(id = userId, name = userName, role = User.Role.valueOf(userRole))
 
-                if (userRepository.read(user.id) == null) {
-                    userRepository.create(user)
-                } else userRepository.update(user)
+                val userExists = userRepository.read(user.id) != null
 
-                user
+                if (userExists) userRepository.update(user)
+                else userRepository.create(user)
+
+                users.add(buildJsonObject {
+                    put("id", user.id)
+                    put("name", user.name)
+                    put("role", user.role.name.lowercase())
+                    put(if (userExists) "updated" else "created", true)
+                })
+            }
+
+            val response = buildJsonObject {
+                put("ok", true)
+                put("result", buildJsonArray {
+                    users.map { user -> add(user) }
+                })
+            }
+
+            call.respond(response)
+        }
+        delete("/users") {
+            val body = call.receive<JsonObject>()
+
+            val users = mutableListOf<User>()
+
+            body["users"]!!.jsonArray.forEach { jsonElement ->
+                val userId = jsonElement.jsonObject["id"]!!.jsonPrimitive.content.toLong()
+
+                val user = userRepository.read(userId)
+
+                if (user != null && user.role != User.Role.ADMIN) {
+                    userRepository.delete(user.id)
+
+                    users.add(user)
+                }
             }
 
             val response = buildJsonObject {

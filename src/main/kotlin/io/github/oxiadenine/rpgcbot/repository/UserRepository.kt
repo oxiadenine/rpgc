@@ -2,6 +2,8 @@ package io.github.oxiadenine.rpgcbot.repository
 
 import io.github.oxiadenine.rpgcbot.Database
 import io.github.oxiadenine.rpgcbot.UserTable
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.update
@@ -23,6 +25,12 @@ class UserRepository(private val database: Database) {
         Unit
     }
 
+    suspend fun read() = database.transaction {
+        UserTable.selectAll().map { record ->
+            User(record[UserTable.id], record[UserTable.name], record[UserTable.role])
+        }
+    }
+
     suspend fun read(id: Long) = database.transaction {
         UserTable.selectAll().where { UserTable.id eq id }.firstOrNull()?.let { record ->
             User(record[UserTable.id], record[UserTable.name], record[UserTable.role])
@@ -31,6 +39,12 @@ class UserRepository(private val database: Database) {
 
     suspend fun update(user: User) = database.transaction {
         UserTable.update({ UserTable.id eq user.id }) { statement -> statement[name] = user.name }
+
+        Unit
+    }
+
+    suspend fun delete(id: Long) = database.transaction {
+        UserTable.deleteWhere { UserTable.id eq id }
 
         Unit
     }

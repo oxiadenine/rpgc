@@ -1,21 +1,20 @@
-FROM gradle:8.11-jdk21 AS build
+FROM eclipse-temurin:21.0.5_11-jre-alpine-3.21
 
-WORKDIR /home/gradle/src
+ARG user
 
-COPY . .
+ENV USER=${user:-root}
 
-RUN chown -R gradle:gradle ./ && gradle build --no-daemon
+WORKDIR /rpgc-bot
 
-FROM eclipse-temurin:21.0.5_11-jre
+COPY build/libs/rpgc-bot.jar .
 
-RUN useradd java
+RUN if [ $USER != "root" ]; then addgroup -g $USER rpgc; fi
+RUN if [ $USER != "root" ]; then adduser -u $USER -D rpgc -G rpgc; fi
 
-WORKDIR /app
+RUN chown -R $USER:$USER /rpgc-bot
 
-COPY --from=build /home/gradle/src/build/libs/rpgc-bot.jar ./
+USER $USER:$USER
 
-RUN chown -R java:java /app
+EXPOSE 8000
 
-USER java
-
-ENTRYPOINT ["java", "-jar", "rpgc-bot.jar"]
+CMD ["java", "-jar", "rpgc-bot.jar"]

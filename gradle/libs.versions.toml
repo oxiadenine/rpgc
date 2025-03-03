@@ -1,0 +1,39 @@
+[versions]
+kotlin = "2.1.10"
+kotlinx-coroutines = "1.10.1"
+kotlinx-serialization = "1.8.0"
+ktor = "3.1.1"
+typesafe-config = "1.4.3"
+jsoup = "1.18.3"
+openhtmltopdf = "1.0.10"
+retrofit = "2.11.0"
+kotlin-telegram-bot = "6.3.0"
+exposed = "0.60.0"
+hikaricp = "6.2.1"
+h2database = "2.3.232"
+logback = "1.5.17"
+
+[libraries]
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
+kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
+ktor-server-cio = { module = "io.ktor:ktor-server-cio", version.ref = "ktor" }
+ktor-server-content-negotiation = { module = "io.ktor:ktor-server-content-negotiation", version.ref = "ktor" }
+ktor-client-cio = { module = "io.ktor:ktor-client-cio", version.ref = "ktor" }
+ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negotiation", version.ref = "ktor" }
+ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
+typesafe-config = { module = "com.typesafe:config", version.ref = "typesafe-config" }
+jsoup = { module = "org.jsoup:jsoup", version.ref = "jsoup" }
+openhtmltopdf-java2d = { module = "com.openhtmltopdf:openhtmltopdf-java2d", version.ref = "openhtmltopdf" }
+retrofit = { module = "com.squareup.retrofit2:retrofit", version.ref = "retrofit" }
+kotlin-telegram-bot = { module = "io.github.kotlin-telegram-bot.kotlin-telegram-bot:telegram", version.ref = "kotlin-telegram-bot" }
+exposed-jdbc = { module = "org.jetbrains.exposed:exposed-jdbc", version.ref = "exposed" }
+hikaricp = { module = "com.zaxxer:HikariCP", version.ref = "hikaricp" }
+h2 = { module = "com.h2database:h2", version.ref = "h2database" }
+logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
+
+[bundles]
+ktor = ["ktor-server-cio", "ktor-server-content-negotiation", "ktor-client-cio", "ktor-client-content-negotiation", "ktor-serialization-kotlinx-json"]
+
+[plugins]
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }

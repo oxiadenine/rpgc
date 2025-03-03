@@ -1,6 +1,6 @@
 plugins {
-    kotlin("jvm")
-    kotlin("plugin.serialization")
+    alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.kotlin.serialization)
     application
 }
 
@@ -10,35 +10,18 @@ repositories {
 }
 
 dependencies {
-    val kotlinxCoroutinesVersion = properties["kotlinx-coroutines.version"] as String
-    val kotlinxSerializationVersion = properties["kotlinx-serialization.version"] as String
-    val ktorVersion = properties["ktor.version"] as String
-    val typesafeConfigVersion = properties["typesafe-config.version"] as String
-    val jsoupVersion = properties["jsoup.version"] as String
-    val openhtmltopdfVersion = properties["openhtmltopdf.version"] as String
-    val retrofitVersion = properties["retrofit.version"] as String
-    val kotlinTelegramBotVersion = properties["kotlin-telegram-bot.version"] as String
-    val exposedVersion = properties["exposed.version"] as String
-    val hikaricpVersion = properties["hikaricp.version"] as String
-    val h2databaseVersion = properties["h2database.version"] as String
-    val logbackVersion = properties["logback.version"] as String
-
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$kotlinxCoroutinesVersion")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:$kotlinxSerializationVersion")
-    implementation("io.ktor:ktor-server-cio:$ktorVersion")
-    implementation("io.ktor:ktor-server-content-negotiation:$ktorVersion")
-    implementation("io.ktor:ktor-client-cio:$ktorVersion")
-    implementation("io.ktor:ktor-client-content-negotiation:$ktorVersion")
-    implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
-    implementation("com.typesafe:config:$typesafeConfigVersion")
-    implementation("org.jsoup:jsoup:$jsoupVersion")
-    implementation("com.openhtmltopdf:openhtmltopdf-java2d:$openhtmltopdfVersion")
-    implementation("com.squareup.retrofit2:retrofit:$retrofitVersion")
-    implementation("io.github.kotlin-telegram-bot.kotlin-telegram-bot:telegram:$kotlinTelegramBotVersion")
-    implementation("org.jetbrains.exposed:exposed-jdbc:$exposedVersion")
-    implementation("com.zaxxer:HikariCP:$hikaricpVersion")
-    implementation("com.h2database:h2:$h2databaseVersion")
-    implementation("ch.qos.logback:logback-classic:$logbackVersion")
+    implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.kotlinx.serialization.json)
+    implementation(libs.bundles.ktor)
+    implementation(libs.typesafe.config)
+    implementation(libs.jsoup)
+    implementation(libs.openhtmltopdf.java2d)
+    implementation(libs.retrofit)
+    implementation(libs.kotlin.telegram.bot)
+    implementation(libs.exposed.jdbc)
+    implementation(libs.hikaricp)
+    implementation(libs.h2)
+    implementation(libs.logback.classic)
 
     testImplementation(kotlin("test"))
 }

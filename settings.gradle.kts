@@ -2,13 +2,6 @@ pluginManagement {
     repositories {
         gradlePluginPortal()
     }
-
-    plugins {
-        val kotlinVersion = extra["kotlin.version"] as String
-
-        kotlin("jvm").version(kotlinVersion)
-        kotlin("plugin.serialization").version(kotlinVersion)
-    }
 }
 
 plugins {

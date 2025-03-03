@@ -741,7 +741,7 @@ fun Application.bot(
     bot.startPolling()
 }
 
-fun Application.api(userRepository: UserRepository, gameRepository: GameRepository) {
+fun Application.api(userRepository: UserRepository) {
     install(io.ktor.server.plugins.contentnegotiation.ContentNegotiation) { json() }
 
     routing {
@@ -829,35 +829,6 @@ fun Application.api(userRepository: UserRepository, gameRepository: GameReposito
 
             call.respond(response)
         }
-        post("/games") {
-            val body = call.receive<JsonObject>()
-
-            val games = body["games"]!!.jsonArray.map { jsonElement ->
-                val gameName = Game.Name(jsonElement.jsonPrimitive.content)
-
-                val game = Game(name = gameName)
-
-                if (gameRepository.read(game.id) == null) {
-                    gameRepository.create(game)
-                } else gameRepository.update(game)
-
-                game
-            }
-
-            val response = buildJsonObject {
-                put("ok", true)
-                put("result", buildJsonArray {
-                    games.map { game ->
-                        add(buildJsonObject {
-                            put("id", game.id.toString())
-                            put("name", game.name.value)
-                        })
-                    }
-                })
-            }
-
-            call.respond(response)
-        }
     }
 }
 
@@ -889,7 +860,7 @@ fun main() {
                 characterRepository,
                 characterImageRepository
             )
-            api(userRepository, gameRepository)
+            api(userRepository)
         }
     ).start(wait = true)
 }

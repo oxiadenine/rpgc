@@ -6,7 +6,6 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
-import org.jetbrains.exposed.sql.update
 import java.util.UUID
 
 class Game(val id: UUID = UUID.randomUUID(), val name: Name = Name()) {
@@ -56,14 +55,6 @@ class GameRepository(private val database: Database) {
         GameTable.selectAll().where { GameTable.id eq id }.firstOrNull()?.let { record ->
             Game(record[GameTable.id], Game.Name(record[GameTable.name]))
         }
-    }
-
-    suspend fun update(game: Game) = database.transaction {
-        GameTable.update({ GameTable.id eq game.id }) { statement ->
-            statement[name] = game.name.value
-        }
-
-        Unit
     }
 
     suspend fun delete(id: UUID) = database.transaction {

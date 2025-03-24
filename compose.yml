@@ -11,6 +11,19 @@ services:
       - ./data:/home/rpgc/data
     networks:
       - rpgc-network
+  rpgc-tools:
+    container_name: rpgc-tools
+    image: rpgc-tools
+    build:
+      context: ./tools
+      args:
+        ugid: ${UGID}
+    stdin_open: true
+    tty: true
+    volumes:
+      - ./data/db:/home/rpgc/db
+    networks:
+      - rpgc-network
 networks:
   rpgc-network:
     name: rpgc-network

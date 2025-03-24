@@ -10,4 +10,4 @@ plugins {
 
 rootProject.name = "rpgc"
 
-include("bot")
+include("bot", "tools")

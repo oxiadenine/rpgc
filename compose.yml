@@ -3,10 +3,10 @@ services:
     container_name: rpgc-bot
     image: rpgc-bot
     build:
-      context: .
+      context: ./bot
       args:
         ugid: ${UGID}
-    env_file: ./.env
+    env_file: ./bot/.env
     volumes:
       - ./data:/home/rpgc/data
     networks:

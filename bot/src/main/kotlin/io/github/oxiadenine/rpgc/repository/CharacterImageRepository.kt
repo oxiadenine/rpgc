@@ -1,7 +1,7 @@
-package io.github.oxiadenine.rpgcbot.repository
+package io.github.oxiadenine.rpgc.repository
 
-import io.github.oxiadenine.rpgcbot.CharacterImageTable
-import io.github.oxiadenine.rpgcbot.Database
+import io.github.oxiadenine.rpgc.CharacterImageTable
+import io.github.oxiadenine.rpgc.Database
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.insert

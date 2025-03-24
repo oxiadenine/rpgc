@@ -1,7 +1,7 @@
-package io.github.oxiadenine.rpgcbot.repository
+package io.github.oxiadenine.rpgc.repository
 
-import io.github.oxiadenine.rpgcbot.Database
-import io.github.oxiadenine.rpgcbot.UserGameSubscriptionTable
+import io.github.oxiadenine.rpgc.Database
+import io.github.oxiadenine.rpgc.UserGameSubscriptionTable
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.deleteWhere

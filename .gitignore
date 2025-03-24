@@ -2,6 +2,6 @@
 .kotlin/
 .gradle/
 build/
-data/
+/data/
 .env
 compose.*.yml

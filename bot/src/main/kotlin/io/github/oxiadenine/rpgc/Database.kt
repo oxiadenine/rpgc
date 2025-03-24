@@ -1,8 +1,8 @@
-package io.github.oxiadenine.rpgcbot
+package io.github.oxiadenine.rpgc
 
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
-import io.github.oxiadenine.rpgcbot.repository.User
+import io.github.oxiadenine.rpgc.repository.User
 import io.ktor.server.config.*
 import kotlinx.coroutines.Dispatchers
 import org.jetbrains.exposed.dao.id.IntIdTable
@@ -58,7 +58,7 @@ object CharacterImageTable : Table("character_image") {
 
 class Database private constructor(private val connection: Database) {
     companion object {
-        fun create(config: ApplicationConfig): io.github.oxiadenine.rpgcbot.Database {
+        fun create(config: ApplicationConfig): io.github.oxiadenine.rpgc.Database {
             val hikariConfig = HikariConfig().apply {
                 jdbcUrl = config.property("url").getString()
                 driverClassName = config.property("driver").getString()

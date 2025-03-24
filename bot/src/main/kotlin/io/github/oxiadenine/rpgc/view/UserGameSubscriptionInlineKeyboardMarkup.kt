@@ -1,9 +1,9 @@
-package io.github.oxiadenine.rpgcbot.view
+package io.github.oxiadenine.rpgc.view
 
 import com.github.kotlintelegrambot.entities.InlineKeyboardMarkup
 import com.github.kotlintelegrambot.entities.keyboard.InlineKeyboardButton
-import io.github.oxiadenine.rpgcbot.repository.Game
-import io.github.oxiadenine.rpgcbot.repository.UserGameSubscription
+import io.github.oxiadenine.rpgc.repository.Game
+import io.github.oxiadenine.rpgc.repository.UserGameSubscription
 
 object UserGameSubscriptionInlineKeyboardMarkup {
     fun create(

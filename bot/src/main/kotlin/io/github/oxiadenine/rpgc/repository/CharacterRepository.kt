@@ -1,7 +1,7 @@
-package io.github.oxiadenine.rpgcbot.repository
+package io.github.oxiadenine.rpgc.repository
 
-import io.github.oxiadenine.rpgcbot.CharacterTable
-import io.github.oxiadenine.rpgcbot.Database
+import io.github.oxiadenine.rpgc.CharacterTable
+import io.github.oxiadenine.rpgc.Database
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.update

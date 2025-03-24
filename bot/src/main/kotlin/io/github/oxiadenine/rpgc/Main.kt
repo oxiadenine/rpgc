@@ -1,4 +1,4 @@
-package io.github.oxiadenine.rpgcbot
+package io.github.oxiadenine.rpgc
 
 import com.github.kotlintelegrambot.bot
 import com.github.kotlintelegrambot.dispatch
@@ -12,10 +12,10 @@ import com.github.kotlintelegrambot.entities.TelegramFile
 import com.github.kotlintelegrambot.entities.inlinequeryresults.InlineQueryResult
 import com.github.kotlintelegrambot.extensions.filters.Filter
 import com.typesafe.config.ConfigFactory
-import io.github.oxiadenine.rpgcbot.repository.*
-import io.github.oxiadenine.rpgcbot.view.CharacterKeyboardReplyMarkup
-import io.github.oxiadenine.rpgcbot.view.GameInlineKeyboardMarkup
-import io.github.oxiadenine.rpgcbot.view.UserGameSubscriptionInlineKeyboardMarkup
+import io.github.oxiadenine.rpgc.repository.*
+import io.github.oxiadenine.rpgc.view.CharacterKeyboardReplyMarkup
+import io.github.oxiadenine.rpgc.view.GameInlineKeyboardMarkup
+import io.github.oxiadenine.rpgc.view.UserGameSubscriptionInlineKeyboardMarkup
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.config.*

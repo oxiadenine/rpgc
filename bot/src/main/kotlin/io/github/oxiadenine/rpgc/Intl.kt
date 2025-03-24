@@ -1,4 +1,4 @@
-package io.github.oxiadenine.rpgcbot
+package io.github.oxiadenine.rpgc
 
 import com.typesafe.config.ConfigFactory
 

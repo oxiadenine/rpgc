@@ -1,11 +1,11 @@
-package io.github.oxiadenine.rpgcbot
+package io.github.oxiadenine.rpgc
 
 import com.github.kotlintelegrambot.Bot
 import com.github.kotlintelegrambot.entities.ChatId
 import com.github.kotlintelegrambot.entities.TelegramFile
 import com.openhtmltopdf.java2d.api.BufferedImagePageProcessor
 import com.openhtmltopdf.java2d.api.Java2DRendererBuilder
-import io.github.oxiadenine.rpgcbot.repository.Character
+import io.github.oxiadenine.rpgc.repository.Character
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import java.awt.image.BufferedImage

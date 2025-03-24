@@ -1,14 +1,14 @@
 services:
-  rpgc_bot:
+  rpgc-bot:
     container_name: rpgc-bot
     image: rpgc-bot
     build:
       context: .
       args:
-        user: ${USER}
+        ugid: ${UGID}
     env_file: ./.env
     volumes:
-      - ./data:/rpgc-bot/data
+      - ./data:/home/rpgc/data
     networks:
       - rpgc-network
 networks:

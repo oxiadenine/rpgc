@@ -1,19 +1,18 @@
 FROM eclipse-temurin:21.0.6_7-jre-alpine-3.21
 
-ARG user
+ARG ugid
 
-ENV USER=${user:-root}
+ENV UGID=${ugid:-1000}
 
-WORKDIR /rpgc-bot
+RUN addgroup -g $UGID rpgc && adduser -u $UGID -D rpgc -G rpgc
+
+WORKDIR /home/rpgc
 
 COPY build/libs/rpgc-bot.jar .
 
-RUN if [ $USER != "root" ]; then addgroup -g $USER rpgc; fi
-RUN if [ $USER != "root" ]; then adduser -u $USER -D rpgc -G rpgc; fi
+RUN chown -R $UGID:$UGID rpgc-bot.jar
 
-RUN chown -R $USER:$USER /rpgc-bot
-
-USER $USER:$USER
+USER $UGID:$UGID
 
 EXPOSE 8000
 

@@ -65,7 +65,10 @@ fun Application.bot(
 
                 val userId = message.chat.id
 
-                val commandName = message.text!!.substringAfter("/").uppercase()
+                val commandData = message.text!!.split(" ")
+
+                val commandName = commandData[0].substringAfter("/").uppercase()
+                val commandArgs = commandData.drop(1)
 
                 if (commandName == Command.START.name) {
                     bot.sendMessage(
@@ -74,27 +77,70 @@ fun Application.bot(
                     )
 
                     return@message
-                } else if (commandName != Command.NEWGAME.name &&
+                } else if (
+                    commandName != Command.NEWGAME.name &&
                     commandName != Command.DELETEGAME.name &&
                     commandName != Command.SETGAMESUB.name &&
                     commandName != Command.NEWCHAR.name &&
                     commandName != Command.EDITCHAR.name &&
                     commandName != Command.NEWCHARRANK.name &&
                     commandName != Command.EDITCHARRANK.name &&
-                    commandName != Command.CANCEL.name) {
-                    if (commandName.length < 3) return@message
+                    commandName != Command.CANCEL.name
+                ) {
+                    gameRepository.read().firstOrNull { game ->
+                        game.name.toCommandName() == commandName.lowercase()
+                    }?.let { game ->
+                        if (commandArgs.isEmpty()) return@message
 
-                    characterRepository.read().filter { character ->
-                        character.name.toCommandName().contains(commandName, true)
-                    }.forEach { character ->
-                        characterImageRepository.read(character.id)?.let { characterImage ->
-                            bot.sendDocument(
-                                chatId = ChatId.fromId(userId),
-                                document = TelegramFile.ByByteArray(
-                                    fileBytes = characterImage.bytes,
-                                    filename = "${characterImage.name}.${characterImage.type}"
+                        val nameKeywords = commandArgs.map { nameKeyword ->
+                            nameKeyword.normalize().replace("[^a-zA-Z0-9 ]".toRegex(), "")
+                        }
+
+                        if (nameKeywords.joinToString("").length < 3) return@message
+
+                        characterRepository.read(game.id).filter { character ->
+                            val characterName = character.name.value
+                                .normalize()
+                                .replace("[^a-zA-Z0-9 ]".toRegex(), "")
+
+                            if (nameKeywords.size > 1) {
+                                val partialNames = characterName.split(" ")
+
+                                nameKeywords.withIndex().all { nameKeyword ->
+                                    val partialName = partialNames.getOrElse(nameKeyword.index) { "" }
+
+                                    if (
+                                        nameKeyword.value.length > 3 &&
+                                        (partialName.isEmpty() || partialName.length < 3)
+                                    ) false else partialName.contains(nameKeyword.value, true)
+                                }
+                            } else characterName.contains(nameKeywords[0], true)
+                        }.forEach { character ->
+                            characterImageRepository.read(character.id)?.let { characterImage ->
+                                bot.sendDocument(
+                                    chatId = ChatId.fromId(userId),
+                                    document = TelegramFile.ByByteArray(
+                                        fileBytes = characterImage.bytes,
+                                        filename = "${characterImage.name}.${characterImage.type}"
+                                    )
                                 )
-                            )
+                            }
+                        }
+                    } ?: run {
+                        if (commandName.length < 3) return@message
+
+                        characterRepository.read().filter { character ->
+                            character.name.toCommandName().contains(commandName, true)
+                        }.forEach { character ->
+                            characterImageRepository.read(character.id)?.let { characterImage ->
+                                bot.sendDocument(
+                                    chatId = ChatId.fromId(userId),
+                                    document = TelegramFile.ByByteArray(
+                                        fileBytes = characterImage.bytes,
+                                        filename = "${characterImage.name}.${characterImage.type}"
+                                    )
+                                )
+                            }
                         }
                     }
 

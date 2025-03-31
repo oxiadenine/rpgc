@@ -6,6 +6,7 @@ import com.github.kotlintelegrambot.entities.TelegramFile
 import com.openhtmltopdf.java2d.api.BufferedImagePageProcessor
 import com.openhtmltopdf.java2d.api.Java2DRendererBuilder
 import io.github.oxiadenine.rpgc.repository.Character
+import io.github.oxiadenine.rpgc.repository.Game
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import java.awt.image.BufferedImage
@@ -18,6 +19,12 @@ import kotlin.io.path.createTempFile
 
 fun String.normalize() = Normalizer.normalize(this, Normalizer.Form.NFKD)
     .replace("\\p{M}".toRegex(), "")
+
+fun Game.Name.toCommandName() = this.value
+    .normalize()
+    .replace("[^a-zA-Z0-9 ]".toRegex(), "")
+    .split(" ")
+    .joinToString("") { it[0].lowercase() }
 
 fun Character.Name.toCommandName() = this.value
     .normalize()

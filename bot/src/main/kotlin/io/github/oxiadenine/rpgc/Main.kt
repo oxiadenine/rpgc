@@ -13,9 +13,7 @@ import com.github.kotlintelegrambot.entities.inlinequeryresults.InlineQueryResul
 import com.github.kotlintelegrambot.extensions.filters.Filter
 import com.typesafe.config.ConfigFactory
 import io.github.oxiadenine.rpgc.repository.*
-import io.github.oxiadenine.rpgc.view.CharacterKeyboardReplyMarkup
-import io.github.oxiadenine.rpgc.view.GameInlineKeyboardMarkup
-import io.github.oxiadenine.rpgc.view.UserGameSubscriptionInlineKeyboardMarkup
+import io.github.oxiadenine.rpgc.view.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.config.*
@@ -159,7 +157,7 @@ fun Application.bot(
                             bot.sendMessage(
                                 chatId = ChatId.fromId(user.id),
                                 text = intl.translate(
-                                    id = "command.cancel.message",
+                                    id = "command.cancel.success.message",
                                     value = "commandName" to currentCommand.name.lowercase()
                                 ),
                                 replyMarkup = ReplyKeyboardRemove()
@@ -176,17 +174,17 @@ fun Application.bot(
                         }
 
                         if (currentCommandMap[user.id] != null) {
+                            val currentCommand = currentCommandMap[user.id]!!
+
                             bot.sendMessage(
                                 chatId = ChatId.fromId(user.id),
-                                text = "\u2062",
-                                replyMarkup = ReplyKeyboardRemove()
-                            ).getOrNull()?.let { message ->
-                                bot.deleteMessage(chatId = ChatId.fromId(user.id), messageId = message.messageId)
-                            }
+                                text = intl.translate(
+                                    id = "command.cancel.warning.message",
+                                    value = "commandName" to currentCommand.name.lowercase()
+                                )
+                            )
 
-                            currentCharacterMap.remove(user.id)
-                            currentGameMap.remove(user.id)
-                            currentCommandMap.remove(user.id)
+                            return@message
                         }
 
                         if (commandName == Command.NEWGAME.name) {

@@ -18,6 +18,7 @@ object UserTable : Table("user") {
     val id = long("id").uniqueIndex()
     val name = varchar("name", 64).index()
     val role = enumeration<User.Role>("role")
+    val language = varchar("language", 4)
 
     override val primaryKey = PrimaryKey(id)
 }

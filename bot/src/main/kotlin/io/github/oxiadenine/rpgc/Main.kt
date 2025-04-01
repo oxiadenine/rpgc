@@ -27,6 +27,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 enum class Command {
     START,
+    SETLANG,
     NEWGAME,
     DELETEGAME,
     SETGAMESUB,
@@ -59,9 +60,11 @@ fun Application.bot(
 
         dispatch {
             message(Filter.Command) {
-                val intl = message.from?.languageCode?.let { locale -> Intl(locale) } ?: Intl()
-
                 val userId = message.chat.id
+
+                var intl = userRepository.read(userId)?.let { user ->
+                    Intl(user.language)
+                } ?: message.from?.languageCode?.let { locale -> Intl(locale) } ?: Intl()
 
                 val commandData = message.text!!.split(" ")
 
@@ -69,6 +72,30 @@ fun Application.bot(
                 val commandArgs = commandData.drop(1)
 
                 if (commandName == Command.START.name) {
+                    val user = userRepository.read(userId)?.let { currentUser ->
+                        val user = User(
+                            id = currentUser.id,
+                            name = message.from?.username ?: currentUser.name,
+                            language = message.from?.languageCode ?: currentUser.language
+                        )
+
+                        userRepository.update(user)
+
+                        user
+                    } ?: run {
+                        val user = User(
+                            id = userId,
+                            name = message.from?.username ?: userId.toString(),
+                            language = message.from?.languageCode ?: Intl.DEFAULT_LOCALE
+                        )
+
+                        userRepository.create(user)
+
+                        user
+                    }
+
+                    intl = Intl(user.language)
+
                     bot.sendMessage(
                         chatId = ChatId.fromId(userId),
                         text = intl.translate(id = "command.start.message")
@@ -76,6 +103,7 @@ fun Application.bot(
 
                     return@message
                 } else if (
+                    commandName != Command.SETLANG.name &&
                     commandName != Command.NEWGAME.name &&
                     commandName != Command.DELETEGAME.name &&
                     commandName != Command.SETGAMESUB.name &&
@@ -143,33 +171,41 @@ fun Application.bot(
                     }
 
                     return@message
+                } else if (commandName == Command.CANCEL.name) {
+                    val currentCommand = currentCommandMap[userId] ?: return@message
+
+                    currentCharacterMap.remove(userId)
+                    currentGameMap.remove(userId)
+                    currentCommandMap.remove(userId)
+
+                    bot.sendMessage(
+                        chatId = ChatId.fromId(userId),
+                        text = intl.translate(
+                            id = "command.cancel.success.message",
+                            value = "commandName" to currentCommand.name.lowercase()
+                        ),
+                        replyMarkup = ReplyKeyboardRemove()
+                    )
+
+                    return@message
                 }
 
                 runCatching {
                     userRepository.read(userId)?.let { user ->
-                        if (commandName == Command.CANCEL.name) {
-                            val currentCommand = currentCommandMap[user.id] ?: return@message
-
-                            currentCharacterMap.remove(user.id)
-                            currentGameMap.remove(user.id)
-                            currentCommandMap.remove(user.id)
-
-                            bot.sendMessage(
-                                chatId = ChatId.fromId(user.id),
-                                text = intl.translate(
-                                    id = "command.cancel.success.message",
-                                    value = "commandName" to currentCommand.name.lowercase()
-                                ),
-                                replyMarkup = ReplyKeyboardRemove()
-                            )
-
-                            return@message
+                        if ((
+                            commandName != Command.START.name &&
+                            commandName != Command.SETLANG.name &&
+                            commandName != Command.CANCEL.name
+                        ) && user.role == User.Role.NORMAL) {
+                            throw User.UnauthorizedError()
                         }
 
-                        if ((commandName == Command.NEWGAME.name ||
+                        if ((
+                            commandName == Command.NEWGAME.name ||
                             commandName == Command.DELETEGAME.name ||
                             commandName == Command.NEWCHAR.name ||
-                            commandName == Command.NEWCHARRANK.name) && user.role == User.Role.EDITOR) {
+                            commandName == Command.NEWCHARRANK.name
+                        ) && user.role != User.Role.ADMIN) {
                             throw User.UnauthorizedError()
                         }
 
@@ -182,6 +218,20 @@ fun Application.bot(
                                     id = "command.cancel.warning.message",
                                     value = "commandName" to currentCommand.name.lowercase()
                                 )
+                            )
+
+                            return@message
+                        }
+
+                        if (commandName == Command.SETLANG.name) {
+                            currentCommandMap[userId] = Command.valueOf(commandName)
+
+                            bot.sendMessage(
+                                chatId = ChatId.fromId(user.id),
+                                text = intl.translate(id = "command.language.list.message"),
+                                replyMarkup = LanguageInlineKeyboardMarkup.create(user, intl.locales.map { locale ->
+                                    Language(intl.translate(id = "command.language.list.item.$locale.message"), locale)
+                                })
                             )
 
                             return@message
@@ -228,7 +278,16 @@ fun Application.bot(
                                 } else GameInlineKeyboardMarkup.create(games)
                             )
                         }
-                    } ?: throw User.UnauthorizedError()
+                    } ?: run {
+                        if (commandName == Command.SETLANG.name) {
+                            bot.sendMessage(
+                                chatId = ChatId.fromId(userId),
+                                text = intl.translate(id = "command.setlang.warning.message")
+                            )
+
+                            return@message
+                        } else throw User.UnauthorizedError()
+                    }
                 }.onFailure { error ->
                     when (error) {
                         is User.UnauthorizedError -> bot.sendMessage(
@@ -248,9 +307,11 @@ fun Application.bot(
             }
 
             message(Filter.Text) {
-                val intl = message.from?.languageCode?.let { locale -> Intl(locale) } ?: Intl()
-
                 val userId = message.chat.id
+
+                val intl = userRepository.read(userId)?.let { user ->
+                    Intl(user.language)
+                } ?: message.from?.languageCode?.let { locale -> Intl(locale) } ?: Intl()
 
                 val currentCommand = currentCommandMap[userId] ?: return@message
 
@@ -534,9 +595,11 @@ fun Application.bot(
             }
 
             message(Filter.Photo) {
-                val intl = message.from?.languageCode?.let { locale -> Intl(locale) } ?: Intl()
-
                 val userId = message.chat.id
+
+                val intl = userRepository.read(userId)?.let { user ->
+                    Intl(user.language)
+                } ?: message.from?.languageCode?.let { locale -> Intl(locale) } ?: Intl()
 
                 val currentCommand = currentCommandMap[userId] ?: return@message
                 val currentGame = currentGameMap[userId] ?: return@message
@@ -641,11 +704,35 @@ fun Application.bot(
             }
 
             callbackQuery {
-                val intl = callbackQuery.from.languageCode?.let { locale -> Intl(locale) } ?: Intl()
-
                 val userId = callbackQuery.message?.chat?.id ?: return@callbackQuery
 
+                val intl = userRepository.read(userId)?.let { user ->
+                    Intl(user.language)
+                } ?: callbackQuery.from.languageCode?.let { locale -> Intl(locale) } ?: Intl()
+
                 val currentCommand = currentCommandMap[userId] ?: return@callbackQuery
+
+                if (currentCommand == Command.SETLANG) {
+                    val user = userRepository.read(userId)!!.let { currentUser ->
+                        User(id = currentUser.id, name = currentUser.name, language = callbackQuery.data)
+                    }
+
+                    userRepository.update(user)
+
+                    currentCommandMap.remove(user.id)
+
+                    bot.sendMessage(
+                        chatId = ChatId.fromId(user.id),
+                        text = intl.translate(
+                            id = "command.setlang.success.message",
+                            value = "language" to intl.translate(
+                                id = "command.language.list.item.${user.language}.message"
+                            )
+                        )
+                    )
+
+                    return@callbackQuery
+                }
 
                 runCatching {
                     val game = gameRepository.read(UUID.fromString(callbackQuery.data))!!
@@ -800,6 +887,7 @@ fun Application.api(userRepository: UserRepository) {
                             put("id", user.id)
                             put("name", user.name)
                             put("role", user.role.name.lowercase())
+                            put("language", user.language)
                         })
                     }
                 })
@@ -813,21 +901,26 @@ fun Application.api(userRepository: UserRepository) {
             val users = mutableListOf<JsonObject>()
 
             body["users"]!!.jsonArray.forEach { jsonElement ->
-                val userId = jsonElement.jsonObject["id"]!!.jsonPrimitive.content.toLong()
-                val userName = jsonElement.jsonObject["name"]!!.jsonPrimitive.content
-                val userRole = jsonElement.jsonObject["role"]!!.jsonPrimitive.content.uppercase()
+                val id = jsonElement.jsonObject["id"]!!.jsonPrimitive.content.toLong()
+                val name = jsonElement.jsonObject["name"]!!.jsonPrimitive.content
+                val role = jsonElement.jsonObject["role"]?.jsonPrimitive?.content?.uppercase()?.let { role ->
+                    User.Role.valueOf(role)
+                } ?: User.Role.EDITOR
+                val language = jsonElement.jsonObject["language"]?.jsonPrimitive?.content ?: Intl.DEFAULT_LOCALE
 
-                val user = User(id = userId, name = userName, role = User.Role.valueOf(userRole))
+                val user = User(id, name, role, language)
 
                 val userExists = userRepository.read(user.id) != null
 
-                if (userExists) userRepository.update(user)
-                else userRepository.create(user)
+                if (userExists) {
+                    userRepository.update(user)
+                } else userRepository.create(user)
 
                 users.add(buildJsonObject {
                     put("id", user.id)
                     put("name", user.name)
                     put("role", user.role.name.lowercase())
+                    put("language", user.language)
                     put(if (userExists) "updated" else "created", true)
                 })
             }
@@ -866,6 +959,7 @@ fun Application.api(userRepository: UserRepository) {
                             put("id", user.id)
                             put("name", user.name)
                             put("role", user.role.name.lowercase())
+                            put("language", user.language)
                         })
                     }
                 })

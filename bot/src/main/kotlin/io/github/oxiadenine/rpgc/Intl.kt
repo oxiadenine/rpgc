@@ -3,22 +3,11 @@ package io.github.oxiadenine.rpgc
 import com.typesafe.config.ConfigFactory
 
 class Intl(locale: String = DEFAULT_LOCALE) {
-    companion object {
-        private val DEFAULT_LOCALE = Language.SPANISH.locale
-    }
+    val locales = listOf(DEFAULT_LOCALE, "en")
 
-    enum class Language(val locale: String) {
-        ENGLISH("en"),
-        SPANISH("es");
-
-        override fun toString() = name.lowercase().replaceFirstChar { it.uppercase() }
-    }
-    
     private val messages: Map<String, String>
     
     init {
-        val locales = Language.entries.map { language -> language.locale }
-        
         val localeResource = if (locales.contains(locale)) {
             "locales/$locale"
         } else "locales/$DEFAULT_LOCALE"
@@ -47,4 +36,8 @@ class Intl(locale: String = DEFAULT_LOCALE) {
 
         translatedMessage
     } ?: ""
+
+    companion object {
+        const val DEFAULT_LOCALE = "es"
+    }
 }

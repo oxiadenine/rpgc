@@ -129,7 +129,26 @@ class EditCharacterCommandHandler(
         if (character.content.value.isEmpty()) {
             if (message.type != CommandMessage.Type.TEXT) return
 
-            val characterContent = Character.Content(message.text)
+            val characterContent = try {
+                Character.Content(message.text)
+            } catch (exception: Character.ContentException) {
+                when (exception) {
+                    is Character.ContentException.Blank -> context.bot.sendMessage(
+                        chatId = ChatId.fromId(context.user.id),
+                        text = context.intl.translate(id = if (character.isRanking) {
+                            "command.character.ranking.content.blank.message"
+                        } else "command.character.content.blank.message")
+                    )
+                    is Character.ContentException.Length -> context.bot.sendMessage(
+                        chatId = ChatId.fromId(context.user.id),
+                        text = context.intl.translate(id = if (character.isRanking) {
+                            "command.character.ranking.content.length.message"
+                        } else "command.character.content.length.message")
+                    )
+                }
+
+                return
+            }
 
             character = Character(
                 id = character.id,

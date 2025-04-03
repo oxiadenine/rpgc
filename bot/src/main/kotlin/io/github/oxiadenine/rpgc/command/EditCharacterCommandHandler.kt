@@ -186,7 +186,25 @@ class EditCharacterCommandHandler(
             }
 
             val characterImageName = character.name.toFileName()
-            val characterImageBytes = character.renderToImage(characterTemplatePath, width = 2048)
+            val characterImageBytes = try {
+                character.renderToImage(characterTemplatePath, width = 2048)
+            } catch (_: Exception) {
+                character = Character(
+                    id = character.id,
+                    name = character.name,
+                    isRanking = character.isRanking,
+                    game = character.game
+                )
+
+                context.bot.sendMessage(
+                    chatId = ChatId.fromId(context.user.id),
+                    text = context.intl.translate(id = if (character.isRanking) {
+                        "command.character.ranking.content.invalid.message"
+                    } else "command.character.content.invalid.message")
+                )
+
+                return
+            }
 
             val characterImage = CharacterImage(
                 name = characterImageName,

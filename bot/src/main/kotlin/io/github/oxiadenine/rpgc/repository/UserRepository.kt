@@ -10,8 +10,6 @@ import org.jetbrains.exposed.sql.update
 
 class User(val id: Long, val name: String, val role: Role = Role.NORMAL, val language: String = "") {
     enum class Role { ADMIN, EDITOR, NORMAL }
-
-    class UnauthorizedError : Error()
 }
 
 class UserRepository(private val database: Database) {

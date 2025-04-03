@@ -2,6 +2,7 @@ package io.github.oxiadenine.rpgc.repository
 
 import io.github.oxiadenine.rpgc.Database
 import io.github.oxiadenine.rpgc.GameTable
+import io.github.oxiadenine.rpgc.normalize
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.insert
@@ -9,23 +10,24 @@ import org.jetbrains.exposed.sql.selectAll
 import java.util.UUID
 
 class Game(val id: UUID = UUID.randomUUID(), val name: Name = Name()) {
-    class Name(name: String? = null) {
-        class BlankError : Error()
-        class LengthError : Error()
-        class InvalidError : Error()
-        class ExistsError : Error()
+    sealed class NameException : Exception() {
+        class Blank : NameException()
+        class Length : NameException()
+        class Invalid : NameException()
+    }
 
-        val value: String = name?.let {
+    class Name(name: String? = null) {
+        val value: String = name?.run {
             if (name.isBlank()) {
-                throw BlankError()
+                throw NameException.Blank()
             }
 
             if (name.length > 64) {
-                throw LengthError()
+                throw NameException.Length()
             }
 
             if (!name.matches("^(.+ ?)+$".toRegex())) {
-                throw InvalidError()
+                throw NameException.Invalid()
             }
 
             name
@@ -34,6 +36,12 @@ class Game(val id: UUID = UUID.randomUUID(), val name: Name = Name()) {
 
     var characters = emptyList<Character>()
 }
+
+fun Game.Name.toCommandName() = this.value
+    .normalize()
+    .replace("[^a-zA-Z0-9 ]".toRegex(), "")
+    .split(" ")
+    .joinToString("") { it[0].lowercase() }
 
 class GameRepository(private val database: Database) {
     suspend fun create(game: Game) = database.transaction {

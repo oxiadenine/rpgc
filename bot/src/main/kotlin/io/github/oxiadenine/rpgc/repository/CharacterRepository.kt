@@ -1,11 +1,21 @@
 package io.github.oxiadenine.rpgc.repository
 
+import com.openhtmltopdf.java2d.api.BufferedImagePageProcessor
+import com.openhtmltopdf.java2d.api.Java2DRendererBuilder
 import io.github.oxiadenine.rpgc.CharacterTable
 import io.github.oxiadenine.rpgc.Database
+import io.github.oxiadenine.rpgc.normalize
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.update
+import org.jsoup.Jsoup
+import org.jsoup.nodes.Document
+import java.awt.image.BufferedImage
+import java.io.ByteArrayOutputStream
+import java.io.File
 import java.util.UUID
+import javax.imageio.ImageIO
+import javax.xml.parsers.DocumentBuilderFactory
 
 class Character(
     val id: UUID = UUID.randomUUID(),
@@ -14,45 +24,107 @@ class Character(
     val isRanking: Boolean = false,
     val game: Game? = null
 ) {
-    class Name(name: String? = null) {
-        class BlankError : Error()
-        class LengthError : Error()
-        class InvalidError : Error()
-        class ExistsError : Error()
+    sealed class NameException : Exception() {
+        class Blank : NameException()
+        class Length : NameException()
+        class Invalid : NameException()
+    }
 
-        val value: String = name?.let {
-            if (name.isBlank()) {
-                throw BlankError()
+    class Name(value: String? = null) {
+        val value: String = value?.run {
+            if (value.isBlank()) {
+                throw NameException.Blank()
             }
 
-            if (name.length > 64) {
-                throw LengthError()
+            if (value.length > 64) {
+                throw NameException.Length()
             }
 
-            if (!name.matches("^(.+ ?)+$".toRegex())) {
-                throw InvalidError()
+            if (!value.matches("^(.+ ?)+$".toRegex())) {
+                throw NameException.Invalid()
             }
 
-            name
+            value
         } ?: ""
     }
 
-    class Content(content: String? = null, val imageFilePath: String? = null) {
-        class BlankError : Error()
-        class LengthError : Error()
+    sealed class ContentException : Exception() {
+        class Blank : ContentException()
+        class Length : ContentException()
+    }
 
-        val value = content?.let {
-            if (content.isBlank()) {
-                throw BlankError()
+    class Content(value: String? = null, val imageFilePath: String? = null) {
+        val value = value?.run {
+            if (value.isBlank()) {
+                throw ContentException.Blank()
             }
 
-            if (content.length > 64000) {
-                throw LengthError()
+            if (value.length > 64000) {
+                throw ContentException.Length()
             }
 
-            content
+            value
         } ?: ""
     }
+}
+
+fun Character.Name.toCommandName() = this.value
+    .normalize()
+    .replace("[^a-zA-Z0-9]".toRegex(), "")
+    .lowercase()
+
+fun Character.Name.toFileName() = this.value
+    .normalize()
+    .replace("[^a-zA-Z0-9 ]".toRegex(), "")
+    .replace(" ", "-")
+    .lowercase()
+
+fun Character.renderToImage(templatePath: String, width: Int): ByteArray = ByteArrayOutputStream().use { outputStream ->
+    val characterTemplateFile = File(templatePath)
+
+    val characterDocument = Jsoup.parse(characterTemplateFile)
+
+    characterDocument.select("#character-name")[0].appendText(this.name.value)
+    characterDocument.select("#game-name")[0].appendText(this.game!!.name.value)
+
+    val characterContentDocument = Jsoup.parse(this.content.value)
+
+    characterDocument.select("div.row")[0]
+        .appendChildren(characterContentDocument.select("div.column"))
+
+    if (this.isRanking) {
+        characterDocument.select("#character-content-image")[0]
+            .attr("src", "file://${this.content.imageFilePath}")
+    }
+
+    characterDocument.select("style")[0]
+        .appendText(characterContentDocument.select("style")[0].html())
+
+    characterDocument.head().select("style")[0].appendText("""
+        @page {
+          size: ${width}px 1px;
+          margin: 0;
+        }
+    """.trimIndent())
+
+    characterDocument.outputSettings().syntax(Document.OutputSettings.Syntax.xml)
+
+    val xhtmlDocument = DocumentBuilderFactory.newInstance().newDocumentBuilder()
+        .parse(characterDocument.html().toByteArray().inputStream())
+    xhtmlDocument.documentURI = characterTemplateFile.toURI().toString()
+
+    val rendererBuilder = Java2DRendererBuilder()
+    val imagePageProcessor = BufferedImagePageProcessor(BufferedImage.TYPE_INT_RGB, 1.0)
+
+    rendererBuilder.withW3cDocument(xhtmlDocument, xhtmlDocument.baseURI)
+    rendererBuilder.useFastMode()
+    rendererBuilder.useEnvironmentFonts(true)
+    rendererBuilder.toSinglePage(imagePageProcessor)
+    rendererBuilder.runFirstPage()
+
+    ImageIO.write(imagePageProcessor.pageImages[0], "png", outputStream)
+
+    outputStream.toByteArray()
 }
 
 class CharacterRepository(private val database: Database) {

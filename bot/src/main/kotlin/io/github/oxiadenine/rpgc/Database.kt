@@ -58,6 +58,19 @@ object CharacterImageTable : Table("character_image") {
 }
 
 class Database private constructor(private val connection: Database) {
+    init {
+        transaction(connection) {
+            SchemaUtils.create(UserTable, GameTable, UserGameSubscriptionTable, CharacterTable, CharacterImageTable)
+        }
+    }
+
+    suspend fun <T> transaction(statement: suspend Transaction.() -> T) = newSuspendedTransaction(
+        context = Dispatchers.IO,
+        db = connection,
+        transactionIsolation = Connection.TRANSACTION_REPEATABLE_READ,
+        statement = statement
+    )
+
     companion object {
         fun create(config: ApplicationConfig): io.github.oxiadenine.rpgc.Database {
             val hikariConfig = HikariConfig().apply {
@@ -76,17 +89,4 @@ class Database private constructor(private val connection: Database) {
             return Database(connection)
         }
     }
-
-    init {
-        transaction(connection) {
-            SchemaUtils.create(UserTable, GameTable, UserGameSubscriptionTable, CharacterTable, CharacterImageTable)
-        }
-    }
-
-    suspend fun <T> transaction(statement: suspend Transaction.() -> T) = newSuspendedTransaction(
-        context = Dispatchers.IO,
-        db = connection,
-        transactionIsolation = Connection.TRANSACTION_REPEATABLE_READ,
-        statement = statement
-    )
 }

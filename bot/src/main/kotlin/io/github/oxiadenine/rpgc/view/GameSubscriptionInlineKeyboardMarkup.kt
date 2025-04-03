@@ -5,7 +5,7 @@ import com.github.kotlintelegrambot.entities.keyboard.InlineKeyboardButton
 import io.github.oxiadenine.rpgc.repository.Game
 import io.github.oxiadenine.rpgc.repository.UserGameSubscription
 
-object UserGameSubscriptionInlineKeyboardMarkup {
+object GameSubscriptionInlineKeyboardMarkup {
     fun create(
         games: List<Game>,
         userGameSubscriptions: List<UserGameSubscription>

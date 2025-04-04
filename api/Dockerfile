@@ -8,10 +8,12 @@ RUN addgroup -g $UGID rpgc && adduser -u $UGID -D rpgc -G rpgc
 
 WORKDIR /home/rpgc
 
-COPY build/libs/rpgc-bot.jar .
+COPY build/libs/rpgc-api.jar .
 
-RUN chown $UGID:$UGID rpgc-bot.jar
+RUN chown $UGID:$UGID rpgc-api.jar
 
 USER $UGID:$UGID
 
-CMD ["java", "-jar", "rpgc-bot.jar"]
+EXPOSE 8000
+
+CMD ["java", "-jar", "rpgc-api.jar"]

@@ -11,6 +11,18 @@ services:
       - ./data:/home/rpgc/data
     networks:
       - rpgc-network
+  rpgc-api:
+    container_name: rpgc-api
+    image: rpgc-api
+    build:
+      context: ./api
+      args:
+        ugid: ${UGID}
+    env_file: ./api/.env
+    volumes:
+      - ./data:/home/rpgc/data
+    networks:
+      - rpgc-network
   rpgc-tools:
     container_name: rpgc-tools
     image: rpgc-tools

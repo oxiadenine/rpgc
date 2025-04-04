@@ -1,19 +1,14 @@
 plugins {
     alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.kotlin.serialization)
     application
-}
-
-repositories {
-    maven("https://jitpack.io")
 }
 
 dependencies {
     implementation(project(":common"))
 
-    implementation(libs.kotlin.telegram.bot)
-    implementation(libs.retrofit)
-    implementation(libs.jsoup)
-    implementation(libs.openhtmltopdf.java2d)
+    implementation(libs.kotlinx.serialization.json)
+    implementation(libs.bundles.ktor)
     implementation(libs.typesafe.config)
     implementation(libs.logback.classic)
 

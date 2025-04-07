@@ -2,9 +2,10 @@ FROM eclipse-temurin:21.0.6_7-jre-alpine-3.21
 
 ARG ugid
 
-ENV UGID=${ugid:-1000}
+ENV UGID=${ugid:-0}
 
-RUN addgroup -g $UGID rpgc && adduser -u $UGID -D rpgc -G rpgc
+RUN if [ $UGID != 0 ]; then addgroup -g $UGID rpgc; fi
+RUN if [ $UGID != 0 ]; then adduser -u $UGID -D rpgc -G rpgc; fi
 
 WORKDIR /home/rpgc
 

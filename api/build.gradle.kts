@@ -6,7 +6,9 @@ plugins {
 
 dependencies {
     implementation(project(":common"))
+    implementation(project(":tools"))
 
+    implementation(libs.kotlinx.datetime)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.bundles.ktor)
     implementation(libs.typesafe.config)
@@ -36,7 +38,11 @@ tasks {
 
         from(configurations.runtimeClasspath.get().map { file: File ->
             if (file.isDirectory) file else zipTree(file)
-        })
+        }) {
+            val projectGroup = project.group.toString().replace(".", "/")
+
+            exclude("$projectGroup/${rootProject.name}/tools/SessionKey.class")
+        }
 
         duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     }

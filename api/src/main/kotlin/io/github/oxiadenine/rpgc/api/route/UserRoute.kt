@@ -7,7 +7,7 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.json.*
 
-fun Routing.userRoute(userRepository: UserRepository) = route("/users") {
+fun Route.userRoute(userRepository: UserRepository) = route("/users") {
     get {
         val users = userRepository.read()
 

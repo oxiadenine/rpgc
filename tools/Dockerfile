@@ -9,9 +9,9 @@ RUN if [ $UGID != 0 ]; then adduser -u $UGID -D rpgc -G rpgc; fi
 
 WORKDIR /home/rpgc
 
-COPY build/downloads/h2.jar .
+COPY build/libs/rpgc-tools.jar .
 
-RUN chown $UGID:$UGID h2.jar
+RUN chown $UGID:$UGID rpgc-tools.jar
 
 USER $UGID:$UGID
 

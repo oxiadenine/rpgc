@@ -2,6 +2,7 @@
 kotlin = "2.1.10"
 kotlinx-coroutines = "1.10.1"
 kotlinx-serialization = "1.8.0"
+kotlinx-datetime = "0.6.2"
 ktor = "3.1.1"
 typesafe-config = "1.4.3"
 jsoup = "1.18.3"
@@ -16,8 +17,11 @@ logback = "1.5.17"
 [libraries]
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
+kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinx-datetime" }
 ktor-server-cio = { module = "io.ktor:ktor-server-cio", version.ref = "ktor" }
 ktor-server-content-negotiation = { module = "io.ktor:ktor-server-content-negotiation", version.ref = "ktor" }
+ktor-server-sessions = { module = "io.ktor:ktor-server-sessions", version.ref = "ktor" }
+ktor-server-auth = { module = "io.ktor:ktor-server-auth", version.ref = "ktor" }
 ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
 typesafe-config = { module = "com.typesafe:config", version.ref = "typesafe-config" }
 jsoup = { module = "org.jsoup:jsoup", version.ref = "jsoup" }
@@ -30,7 +34,7 @@ h2 = { module = "com.h2database:h2", version.ref = "h2database" }
 logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
 
 [bundles]
-ktor = ["ktor-server-cio", "ktor-server-content-negotiation", "ktor-serialization-kotlinx-json"]
+ktor = ["ktor-server-cio", "ktor-server-content-negotiation", "ktor-server-sessions", "ktor-server-auth", "ktor-serialization-kotlinx-json"]
 
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }

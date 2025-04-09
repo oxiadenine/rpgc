@@ -2,10 +2,72 @@ package io.github.oxiadenine.rpgc.api.route
 
 import io.github.oxiadenine.rpgc.common.repository.User
 import io.github.oxiadenine.rpgc.common.repository.UserRepository
+import io.ktor.server.plugins.requestvalidation.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
+import java.lang.NumberFormatException
+
+@Serializable
+data class UsersPost(val users: JsonArray)
+
+@Serializable
+data class UsersDelete(val users: JsonArray)
+
+fun RequestValidationConfig.validateUsersPost() = validate<UsersPost> { usersPost ->
+    usersPost.users.forEachIndexed { index, userJson ->
+        if (userJson !is JsonObject) {
+            return@validate ValidationResult.Invalid("Field users element at index $index is not a JsonObject")
+        }
+
+        val id = userJson.jsonObject["id"]?.jsonPrimitive?.content
+            ?: return@validate ValidationResult.Invalid("Field id is missing at users element index $index")
+
+        if (id.isEmpty()) {
+            return@validate ValidationResult.Invalid("Field id is empty at users element index $index")
+        }
+
+        try {
+            id.toLong()
+        } catch (_: NumberFormatException) {
+            return@validate ValidationResult.Invalid("Field id is not a number at users element index $index")
+        }
+
+        val name = userJson.jsonObject["name"]?.jsonPrimitive?.content
+            ?: return@validate ValidationResult.Invalid("Field name is missing at users element index $index")
+
+        if (name.isEmpty()) {
+            return@validate ValidationResult.Invalid("Field name is empty at users element index $index")
+        }
+    }
+
+    ValidationResult.Valid
+}
+
+fun RequestValidationConfig.validateUsersDelete() = validate<UsersDelete> { usersDelete ->
+    usersDelete.users.forEachIndexed { index, userJson ->
+        if (userJson !is JsonObject) {
+            return@validate ValidationResult.Invalid("Field users element at index $index is not a JsonObject")
+        }
+
+        val id = userJson.jsonObject["id"]?.jsonPrimitive?.content
+            ?: return@validate ValidationResult.Invalid("Field id is missing at users element index $index")
+
+        if (id.isEmpty()) {
+            return@validate ValidationResult.Invalid("Field id is empty at users element index $index")
+        }
+
+        try {
+            id.toLong()
+        } catch (_: NumberFormatException) {
+            return@validate ValidationResult.Invalid("Field id is not a number at users element index $index")
+        }
+    }
+
+    ValidationResult.Valid
+}
 
 fun Route.userRoute(userRepository: UserRepository) = route("/users") {
     get {
@@ -27,12 +89,13 @@ fun Route.userRoute(userRepository: UserRepository) = route("/users") {
 
         call.respond(response)
     }
+
     post {
-        val body = call.receive<JsonObject>()
+        val usersPost = call.receive<UsersPost>()
 
         val users = mutableListOf<JsonObject>()
 
-        body["users"]!!.jsonArray.forEach { jsonElement ->
+        usersPost.users.jsonArray.forEach { jsonElement ->
             val id = jsonElement.jsonObject["id"]!!.jsonPrimitive.content.toLong()
             val name = jsonElement.jsonObject["name"]!!.jsonPrimitive.content
             val role = jsonElement.jsonObject["role"]?.jsonPrimitive?.content?.uppercase()?.let { role ->
@@ -66,15 +129,16 @@ fun Route.userRoute(userRepository: UserRepository) = route("/users") {
 
         call.respond(response)
     }
+
     delete {
-        val body = call.receive<JsonObject>()
+        val usersDelete = call.receive<UsersDelete>()
 
         val users = mutableListOf<User>()
 
-        body["users"]!!.jsonArray.forEach { jsonElement ->
-            val userId = jsonElement.jsonObject["id"]!!.jsonPrimitive.content.toLong()
+        usersDelete.users.jsonArray.forEach { jsonElement ->
+            val id = jsonElement.jsonObject["id"]!!.jsonPrimitive.content.toLong()
 
-            val user = userRepository.read(userId)
+            val user = userRepository.read(id)
 
             if (user != null && user.role != User.Role.ADMIN) {
                 userRepository.delete(user.id)

@@ -20,6 +20,8 @@ kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serializa
 kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinx-datetime" }
 ktor-server-cio = { module = "io.ktor:ktor-server-cio", version.ref = "ktor" }
 ktor-server-content-negotiation = { module = "io.ktor:ktor-server-content-negotiation", version.ref = "ktor" }
+ktor-server-request-validation = { module = "io.ktor:ktor-server-request-validation", version.ref = "ktor" }
+ktor-server-status-pages = { module = "io.ktor:ktor-server-status-pages", version.ref = "ktor" }
 ktor-server-sessions = { module = "io.ktor:ktor-server-sessions", version.ref = "ktor" }
 ktor-server-auth = { module = "io.ktor:ktor-server-auth", version.ref = "ktor" }
 ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
@@ -34,7 +36,15 @@ h2 = { module = "com.h2database:h2", version.ref = "h2database" }
 logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
 
 [bundles]
-ktor = ["ktor-server-cio", "ktor-server-content-negotiation", "ktor-server-sessions", "ktor-server-auth", "ktor-serialization-kotlinx-json"]
+ktor = [
+    "ktor-server-cio",
+    "ktor-server-content-negotiation",
+    "ktor-server-request-validation",
+    "ktor-server-status-pages",
+    "ktor-server-sessions",
+    "ktor-server-auth",
+    "ktor-serialization-kotlinx-json"
+]
 
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }

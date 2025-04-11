@@ -25,7 +25,7 @@ kotlin {
 }
 
 application {
-    mainClass.set("${project.group}.${rootProject.name}.${project.name}.MainKt")
+    mainClass.set("${project.group}.${rootProject.name}.bot.MainKt")
 }
 
 tasks {
@@ -34,7 +34,7 @@ tasks {
     }
 
     jar {
-        archiveBaseName.set("${rootProject.name}-${project.name}")
+        archiveBaseName.set("${rootProject.name}-bot")
         archiveVersion.set("")
 
         manifest.attributes["Main-Class"] = application.mainClass.get()

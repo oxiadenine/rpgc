@@ -4,7 +4,6 @@ plugins {
 
 dependencies {
     implementation(libs.kotlinx.coroutines.core)
-
     implementation(libs.exposed.jdbc)
     implementation(libs.hikaricp)
     implementation(libs.h2)

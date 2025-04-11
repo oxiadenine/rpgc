@@ -10,4 +10,7 @@ plugins {
 
 rootProject.name = "rpgc"
 
-include("common", "bot", "api", "tools")
+include("common")
+include("telegramBot", "discordBot")
+include("api")
+include("tools")

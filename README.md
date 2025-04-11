@@ -22,8 +22,9 @@ This project uses [Gradle](https://gradle.org/) for build and dependency managem
 
 To generate JAR packages run the following commands:
 
+- Build Telegram bot application with `gradlew telegramBot:build`
+- Build Discord bot application with `gradlew discordBot:build`
 - Build API application with `gradlew api:build`
-- Build bot application with `gradlew bot:build`
 - Download H2 database tools with `gradlew tools:downloadH2Jar`
 
 ## Deployment

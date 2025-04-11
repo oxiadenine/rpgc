@@ -9,6 +9,7 @@ jsoup = "1.18.3"
 openhtmltopdf = "1.0.10"
 retrofit = "2.11.0"
 kotlin-telegram-bot = "6.3.0"
+kord = "0.15.0"
 exposed = "0.60.0"
 hikaricp = "6.2.1"
 h2database = "2.3.232"
@@ -30,6 +31,7 @@ jsoup = { module = "org.jsoup:jsoup", version.ref = "jsoup" }
 openhtmltopdf-java2d = { module = "com.openhtmltopdf:openhtmltopdf-java2d", version.ref = "openhtmltopdf" }
 retrofit = { module = "com.squareup.retrofit2:retrofit", version.ref = "retrofit" }
 kotlin-telegram-bot = { module = "io.github.kotlin-telegram-bot.kotlin-telegram-bot:telegram", version.ref = "kotlin-telegram-bot" }
+kord-core = { module = "dev.kord:kord-core", version.ref = "kord" }
 exposed-jdbc = { module = "org.jetbrains.exposed:exposed-jdbc", version.ref = "exposed" }
 hikaricp = { module = "com.zaxxer:HikariCP", version.ref = "hikaricp" }
 h2 = { module = "com.h2database:h2", version.ref = "h2database" }

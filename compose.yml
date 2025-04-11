@@ -1,12 +1,24 @@
 services:
-  rpgc-bot:
-    container_name: rpgc-bot
-    image: rpgc-bot
+  rpgc-telegram-bot:
+    container_name: rpgc-telegram-bot
+    image: rpgc-telegram-bot
     build:
-      context: ./bot
+      context: ./telegramBot
       args:
         ugid: ${UGID}
-    env_file: ./bot/.env
+    env_file: ./telegramBot/.env
+    volumes:
+      - ./data:/home/rpgc/data
+    networks:
+      - rpgc-network
+  rpgc-discord-bot:
+    container_name: rpgc-discord-bot
+    image: rpgc-discord-bot
+    build:
+      context: ./discordBot
+      args:
+        ugid: ${UGID}
+    env_file: ./discordBot/.env
     volumes:
       - ./data:/home/rpgc/data
     networks:
